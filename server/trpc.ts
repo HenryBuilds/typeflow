@@ -1,14 +1,46 @@
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
+import type { Context } from "./context";
+import { db } from "@/db/db";
+import { organizations, organizationMembers } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 
-/**
- * Initialization of tRPC backend
- * Should be done only once per backend!
- */
-const t = initTRPC.create();
+const t = initTRPC.context<Context>().create();
 
-/**
- * Export reusable router and procedure helpers
- * that can be used throughout the router
- */
 export const router = t.router;
 export const publicProcedure = t.procedure;
+
+export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
+  return next({
+    ctx: {
+      ...ctx,
+    },
+  });
+});
+
+import { z } from "zod";
+
+export const organizationProcedure = protectedProcedure
+  .input(
+    z.object({
+      organizationId: z.string().uuid(),
+    })
+  )
+  .use(async ({ ctx, input, next }) => {
+    const organization = await db.query.organizations.findFirst({
+      where: eq(organizations.id, input.organizationId),
+    });
+
+    if (!organization) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Organization not found",
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        organization,
+      },
+    });
+  });
