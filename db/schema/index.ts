@@ -1,6 +1,9 @@
 import { relations, type InferSelectModel, type InferInsertModel } from "drizzle-orm";
 
 // Export all schemas
+export * from "./organizations";
+export * from "./users";
+export * from "./organization-members";
 export * from "./workflows";
 export * from "./nodes";
 export * from "./connections";
@@ -11,6 +14,9 @@ export * from "./webhooks";
 export * from "./environments";
 
 // Import tables for relations
+import { organizations } from "./organizations";
+import { users } from "./users";
+import { organizationMembers } from "./organization-members";
 import { workflows } from "./workflows";
 import { nodes } from "./nodes";
 import { connections } from "./connections";
@@ -21,7 +27,39 @@ import { packages } from "./packages";
 import { environments } from "./environments";
 
 // Define all relations here to avoid circular dependencies
-export const workflowsRelations = relations(workflows, ({ many }) => ({
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  members: many(organizationMembers),
+  workflows: many(workflows),
+  packages: many(packages),
+  environments: many(environments),
+  webhooks: many(webhooks),
+  executions: many(executions),
+  logs: many(logs),
+}));
+
+export const usersRelations = relations(users, ({ many }) => ({
+  organizationMemberships: many(organizationMembers),
+}));
+
+export const organizationMembersRelations = relations(
+  organizationMembers,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [organizationMembers.organizationId],
+      references: [organizations.id],
+    }),
+    user: one(users, {
+      fields: [organizationMembers.userId],
+      references: [users.id],
+    }),
+  })
+);
+
+export const workflowsRelations = relations(workflows, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [workflows.organizationId],
+    references: [organizations.id],
+  }),
   nodes: many(nodes),
   executions: many(executions),
   webhooks: many(webhooks),
@@ -41,19 +79,41 @@ export const nodesRelations = relations(nodes, ({ one, many }) => ({
 }));
 
 export const connectionsRelations = relations(connections, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [connections.organizationId],
+    references: [organizations.id],
+  }),
   sourceNode: one(nodes, {
     fields: [connections.sourceNodeId],
     references: [nodes.id],
-    relationName: 'source',
+    relationName: "source",
   }),
   targetNode: one(nodes, {
     fields: [connections.targetNodeId],
     references: [nodes.id],
-    relationName: 'target',
+    relationName: "target",
+  }),
+}));
+
+export const packagesRelations = relations(packages, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [packages.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const environmentsRelations = relations(environments, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [environments.organizationId],
+    references: [organizations.id],
   }),
 }));
 
 export const executionsRelations = relations(executions, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [executions.organizationId],
+    references: [organizations.id],
+  }),
   workflow: one(workflows, {
     fields: [executions.workflowId],
     references: [workflows.id],
@@ -62,6 +122,10 @@ export const executionsRelations = relations(executions, ({ one, many }) => ({
 }));
 
 export const logsRelations = relations(logs, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [logs.organizationId],
+    references: [organizations.id],
+  }),
   execution: one(executions, {
     fields: [logs.executionId],
     references: [executions.id],
@@ -69,6 +133,10 @@ export const logsRelations = relations(logs, ({ one }) => ({
 }));
 
 export const webhooksRelations = relations(webhooks, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [webhooks.organizationId],
+    references: [organizations.id],
+  }),
   workflow: one(workflows, {
     fields: [webhooks.workflowId],
     references: [workflows.id],
@@ -76,6 +144,15 @@ export const webhooksRelations = relations(webhooks, ({ one }) => ({
 }));
 
 // Export inferred types
+export type Organization = InferSelectModel<typeof organizations>;
+export type NewOrganization = InferInsertModel<typeof organizations>;
+
+export type User = InferSelectModel<typeof users>;
+export type NewUser = InferInsertModel<typeof users>;
+
+export type OrganizationMember = InferSelectModel<typeof organizationMembers>;
+export type NewOrganizationMember = InferInsertModel<typeof organizationMembers>;
+
 export type Workflow = InferSelectModel<typeof workflows>;
 export type NewWorkflow = InferInsertModel<typeof workflows>;
 
