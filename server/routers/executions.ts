@@ -3,7 +3,11 @@ import { router, organizationProcedure } from "../trpc";
 import { db } from "@/db/db";
 import { executions, logs } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { executionStatusEnum, triggerTypeEnum } from "@/db/schema/executions";
+import {
+  executionStatusEnum,
+  triggerTypeEnum,
+  type ExecutionStatus,
+} from "@/db/schema/executions";
 
 export const executionsRouter = router({
   // List executions for organization
@@ -59,7 +63,7 @@ export const executionsRouter = router({
       z.object({
         workflowId: z.string().uuid(),
         triggerType: z.enum(["manual", "webhook", "cron", "api"]),
-        triggerData: z.record(z.unknown()).optional(),
+        triggerData: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -93,6 +97,7 @@ export const executionsRouter = router({
         error: z.string().optional(),
         nodeResults: z
           .record(
+            z.string(),
             z.object({
               status: z.enum(["pending", "running", "completed", "failed"]),
               output: z.unknown().optional(),
@@ -105,15 +110,23 @@ export const executionsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const updateData: {
-        status: string;
+        status: ExecutionStatus;
         result?: unknown;
         error?: string;
-        nodeResults?: unknown;
+        nodeResults?: Record<
+          string,
+          {
+            status: "pending" | "running" | "completed" | "failed";
+            output?: unknown;
+            error?: string;
+            duration?: number;
+          }
+        >;
         startedAt?: Date;
         completedAt?: Date;
         duration?: number;
       } = {
-        status: input.status,
+        status: input.status as ExecutionStatus,
       };
 
       if (input.status === "running" && !input.result) {
@@ -140,7 +153,15 @@ export const executionsRouter = router({
       }
 
       if (input.nodeResults !== undefined) {
-        updateData.nodeResults = input.nodeResults;
+        updateData.nodeResults = input.nodeResults as Record<
+          string,
+          {
+            status: "pending" | "running" | "completed" | "failed";
+            output?: unknown;
+            error?: string;
+            duration?: number;
+          }
+        >;
       }
 
       const [updated] = await db
@@ -194,7 +215,7 @@ export const executionsRouter = router({
         nodeId: z.string().uuid().optional(),
         level: z.enum(["info", "warn", "error", "debug"]),
         message: z.string(),
-        data: z.record(z.unknown()).optional(),
+        data: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

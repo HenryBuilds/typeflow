@@ -63,8 +63,8 @@ export const webhooksRouter = router({
         path: z.string().min(1),
         method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).default("POST"),
         authType: z.enum(["none", "api_key", "bearer", "basic"]).optional(),
-        authConfig: z.record(z.unknown()).optional(),
-        requestSchema: z.record(z.unknown()).optional(),
+        authConfig: z.record(z.string(), z.unknown()).optional(),
+        requestSchema: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -93,8 +93,8 @@ export const webhooksRouter = router({
         method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).optional(),
         isActive: z.boolean().optional(),
         authType: z.enum(["none", "api_key", "bearer", "basic"]).optional(),
-        authConfig: z.record(z.unknown()).optional(),
-        requestSchema: z.record(z.unknown()).optional(),
+        authConfig: z.record(z.string(), z.unknown()).optional(),
+        requestSchema: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

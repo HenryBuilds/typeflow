@@ -37,10 +37,10 @@ export const packagesRouter = router({
       z.object({
         name: z.string().min(1),
         version: z.string().min(1),
-        packageJson: z.record(z.unknown()),
+        packageJson: z.record(z.string(), z.unknown()),
         typeDefinitions: z.string().optional(),
-        dependencies: z.record(z.string()).optional(),
-        devDependencies: z.record(z.string()).optional(),
+        dependencies: z.record(z.string(), z.string()).optional(),
+        devDependencies: z.record(z.string(), z.string()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -60,8 +60,8 @@ export const packagesRouter = router({
             version: input.version,
             packageJson: input.packageJson,
             typeDefinitions: input.typeDefinitions,
-            dependencies: input.dependencies,
-            devDependencies: input.devDependencies,
+            dependencies: input.dependencies as Record<string, string> | undefined,
+            devDependencies: input.devDependencies as Record<string, string> | undefined,
             installedAt: new Date(),
             isActive: true,
           })
@@ -80,8 +80,8 @@ export const packagesRouter = router({
           version: input.version,
           packageJson: input.packageJson,
           typeDefinitions: input.typeDefinitions,
-          dependencies: input.dependencies,
-          devDependencies: input.devDependencies,
+          dependencies: input.dependencies as Record<string, string> | undefined,
+          devDependencies: input.devDependencies as Record<string, string> | undefined,
         })
         .returning();
 

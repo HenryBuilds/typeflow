@@ -55,7 +55,7 @@ export const workflowsRouter = router({
         name: z.string().min(1),
         description: z.string().optional(),
         version: z.string().default("1.0.0"),
-        metadata: z.record(z.unknown()).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -82,7 +82,7 @@ export const workflowsRouter = router({
         description: z.string().optional(),
         version: z.string().optional(),
         isActive: z.boolean().optional(),
-        metadata: z.record(z.unknown()).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -134,7 +134,7 @@ export const workflowsRouter = router({
           name: z.string().min(1),
           description: z.string().optional(),
           version: z.string().optional(),
-          metadata: z.record(z.unknown()).optional(),
+          metadata: z.record(z.string(), z.unknown()).optional(),
         }),
         nodes: z.array(
           z.object({
@@ -142,7 +142,7 @@ export const workflowsRouter = router({
             type: z.string(),
             label: z.string(),
             position: z.object({ x: z.number(), y: z.number() }),
-            config: z.record(z.unknown()).optional(),
+            config: z.record(z.string(), z.unknown()).optional(),
             executionOrder: z.number().optional(),
           })
         ),
@@ -153,7 +153,7 @@ export const workflowsRouter = router({
             targetNodeId: z.string().uuid(),
             sourceHandle: z.string().optional(),
             targetHandle: z.string().optional(),
-            dataMapping: z.record(z.string()).optional(),
+            dataMapping: z.record(z.string(), z.string()).optional(),
           })
         ),
       })
