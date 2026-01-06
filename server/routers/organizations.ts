@@ -3,6 +3,7 @@ import { router, protectedProcedure, organizationProcedure } from "../trpc";
 import { db } from "@/db/db";
 import { organizations, organizationMembers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 
 export const organizationsRouter = router({
   // Get all organizations for current user
@@ -43,6 +44,51 @@ export const organizationsRouter = router({
       return org;
     }),
 
+  // Check slug availability and suggest alternative
+  checkSlugAvailability: protectedProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      if (!input.slug || input.slug.length === 0) {
+        return {
+          available: false,
+          suggestedSlug: null,
+        };
+      }
+
+      const existing = await db.query.organizations.findFirst({
+        where: eq(organizations.slug, input.slug),
+      });
+
+      if (!existing) {
+        return {
+          available: true,
+          suggestedSlug: null,
+        };
+      }
+
+      let counter = 1;
+      let suggestedSlug = `${input.slug}-${counter}`;
+      let isAvailable = false;
+
+      while (!isAvailable && counter < 100) {
+        const check = await db.query.organizations.findFirst({
+          where: eq(organizations.slug, suggestedSlug),
+        });
+
+        if (!check) {
+          isAvailable = true;
+        } else {
+          counter++;
+          suggestedSlug = `${input.slug}-${counter}`;
+        }
+      }
+
+      return {
+        available: false,
+        suggestedSlug: isAvailable ? suggestedSlug : null,
+      };
+    }),
+
   // Create new organization
   create: protectedProcedure
     .input(
@@ -53,6 +99,36 @@ export const organizationsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const existing = await db.query.organizations.findFirst({
+        where: eq(organizations.slug, input.slug),
+      });
+
+      if (existing) {
+        let counter = 1;
+        let suggestedSlug = `${input.slug}-${counter}`;
+        let isAvailable = false;
+
+        while (!isAvailable && counter < 100) {
+          const check = await db.query.organizations.findFirst({
+            where: eq(organizations.slug, suggestedSlug),
+          });
+
+          if (!check) {
+            isAvailable = true;
+          } else {
+            counter++;
+            suggestedSlug = `${input.slug}-${counter}`;
+          }
+        }
+
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Slug "${input.slug}" is already taken. ${
+            isAvailable ? `Suggested: "${suggestedSlug}"` : "Please choose a different slug."
+          }`,
+        });
+      }
+
       const [org] = await db
         .insert(organizations)
         .values({

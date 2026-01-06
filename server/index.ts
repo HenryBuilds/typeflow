@@ -5,8 +5,10 @@ import { packagesRouter } from "./routers/packages";
 import { executionsRouter } from "./routers/executions";
 import { environmentsRouter } from "./routers/environments";
 import { webhooksRouter } from "./routers/webhooks";
+import { authRouter } from "./routers/auth";
 
 export const appRouter = router({
+  auth: authRouter,
   organizations: organizationsRouter,
   workflows: workflowsRouter,
   packages: packagesRouter,
