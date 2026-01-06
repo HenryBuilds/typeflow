@@ -22,8 +22,12 @@ export default function NewOrganizationPage() {
   const [error, setError] = useState("");
   const [debouncedSlug, setDebouncedSlug] = useState("");
 
+  const utils = trpc.useUtils();
+
   const createMutation = trpc.organizations.create.useMutation({
-    onSuccess: (org) => {
+    onSuccess: async (org) => {
+      await utils.organizations.list.invalidate();
+      await utils.organizations.getById.invalidate({ id: org.id });
       router.push(`/organizations/${org.id}`);
     },
     onError: (err) => {

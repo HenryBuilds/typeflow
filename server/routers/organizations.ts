@@ -8,25 +8,39 @@ import { TRPCError } from "@trpc/server";
 export const organizationsRouter = router({
   // Get all organizations for current user
   list: protectedProcedure.query(async ({ ctx }) => {
-    // TODO: Filter by user membership
-    return await db.query.organizations.findMany({
-      orderBy: (orgs, { desc }) => [desc(orgs.createdAt)],
+    const memberships = await db.query.organizationMembers.findMany({
+      where: eq(organizationMembers.userId, ctx.userId!),
+      with: {
+        organization: true,
+      },
+      orderBy: (members, { desc }) => [desc(members.joinedAt)],
     });
+
+    return memberships.map((m) => m.organization);
   }),
 
   // Get single organization by ID
   getById: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const org = await db.query.organizations.findFirst({
-        where: eq(organizations.id, input.id),
+      const membership = await db.query.organizationMembers.findFirst({
+        where: and(
+          eq(organizationMembers.organizationId, input.id),
+          eq(organizationMembers.userId, ctx.userId!)
+        ),
+        with: {
+          organization: true,
+        },
       });
 
-      if (!org) {
-        throw new Error("Organization not found");
+      if (!membership) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found or you are not a member",
+        });
       }
 
-      return org;
+      return membership.organization;
     }),
 
   // Get organization by slug
@@ -124,7 +138,9 @@ export const organizationsRouter = router({
         throw new TRPCError({
           code: "CONFLICT",
           message: `Slug "${input.slug}" is already taken. ${
-            isAvailable ? `Suggested: "${suggestedSlug}"` : "Please choose a different slug."
+            isAvailable
+              ? `Suggested: "${suggestedSlug}"`
+              : "Please choose a different slug."
           }`,
         });
       }
@@ -138,12 +154,11 @@ export const organizationsRouter = router({
         })
         .returning();
 
-      // TODO: Add creator as owner member
-      // await db.insert(organizationMembers).values({
-      //   organizationId: org.id,
-      //   userId: ctx.userId!,
-      //   role: "owner",
-      // });
+      await db.insert(organizationMembers).values({
+        organizationId: org.id,
+        userId: ctx.userId!,
+        role: "owner",
+      });
 
       return org;
     }),

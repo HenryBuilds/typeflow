@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useLogout } from "@/hooks/use-auth";
@@ -13,8 +13,13 @@ interface NavbarClientProps {
 
 export function NavbarClient({ isAuthenticated }: NavbarClientProps) {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const logoutMutation = useLogout();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -24,6 +29,8 @@ export function NavbarClient({ isAuthenticated }: NavbarClientProps) {
     logoutMutation.mutate();
     setMobileMenuOpen(false);
   };
+
+  const ThemeIcon = mounted && theme === "dark" ? Sun : Moon;
 
   return (
     <>
@@ -40,12 +47,9 @@ export function NavbarClient({ isAuthenticated }: NavbarClientProps) {
               size="icon"
               onClick={toggleTheme}
               aria-label="Toggle theme"
+              suppressHydrationWarning
             >
-              {theme === "dark" ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
+              <ThemeIcon className="h-5 w-5" />
             </Button>
             <Button
               variant="ghost"
@@ -64,12 +68,9 @@ export function NavbarClient({ isAuthenticated }: NavbarClientProps) {
               size="icon"
               onClick={toggleTheme}
               aria-label="Toggle theme"
+              suppressHydrationWarning
             >
-              {theme === "dark" ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
+              <ThemeIcon className="h-5 w-5" />
             </Button>
             <Link href="/login">
               <Button variant="ghost" size="sm">
@@ -93,12 +94,9 @@ export function NavbarClient({ isAuthenticated }: NavbarClientProps) {
           size="icon"
           onClick={toggleTheme}
           aria-label="Toggle theme"
+          suppressHydrationWarning
         >
-          {theme === "dark" ? (
-            <Sun className="h-5 w-5" />
-          ) : (
-            <Moon className="h-5 w-5" />
-          )}
+          <ThemeIcon className="h-5 w-5" />
         </Button>
         <Button
           variant="ghost"
