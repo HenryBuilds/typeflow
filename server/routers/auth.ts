@@ -101,4 +101,24 @@ export const authRouter = router({
   logout: publicProcedure.mutation(async () => {
     return { success: true };
   }),
+
+  me: publicProcedure.query(async ({ ctx }) => {
+    if (!ctx.userId) {
+      return null;
+    }
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, ctx.userId),
+    });
+
+    if (!user || !user.isActive) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    };
+  }),
 });
