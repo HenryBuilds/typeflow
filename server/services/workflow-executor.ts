@@ -464,43 +464,88 @@ export class WorkflowExecutor {
         ? `${typeDefinitions}\n\n${code}`
         : code;
 
-      // Transpile TypeScript to JavaScript with better ES2020 support and error checking
-      const transpileResult = ts.transpileModule(fullCode, {
-        compilerOptions: {
-          target: ts.ScriptTarget.ES2020,
-          module: ts.ModuleKind.None,
-          lib: ["ES2020", "DOM"],
-          esModuleInterop: true,
-          skipLibCheck: true,
-          downlevelIteration: true,
-          noEmitOnError: false, // Still emit JS even with errors so we can check diagnostics
-        },
-        reportDiagnostics: true,
-      });
+      // Wrap code in async function for type checking (same as runtime execution)
+      const wrappedCodeForTypeCheck = `
+        ${typeDefinitions || ''}
+        
+        async function __userCode__() {
+          ${code}
+        }
+      `;
+
+      // Create a virtual source file for type checking
+      const fileName = "code.ts";
+      const sourceFile = ts.createSourceFile(
+        fileName,
+        wrappedCodeForTypeCheck,
+        ts.ScriptTarget.ES2020,
+        true
+      );
+
+      // Create compiler options
+      const compilerOptions: ts.CompilerOptions = {
+        target: ts.ScriptTarget.ES2020,
+        module: ts.ModuleKind.None,
+        lib: ['lib.es2020.d.ts'],
+        strict: true,
+        noImplicitAny: true,
+        strictNullChecks: true,
+        strictFunctionTypes: true,
+        noUnusedLocals: false,
+        noUnusedParameters: false,
+        skipLibCheck: true,
+        types: [],
+      };
+
+      // Create a virtual compiler host that uses TypeScript's built-in lib files
+      const host = ts.createCompilerHost(compilerOptions);
+      const originalGetSourceFile = host.getSourceFile;
+      
+      host.getSourceFile = (name, languageVersion, onError, shouldCreateNewSourceFile) => {
+        if (name === fileName) {
+          return sourceFile;
+        }
+        // Let TypeScript load its default lib files from node_modules
+        return originalGetSourceFile.call(host, name, languageVersion, onError, shouldCreateNewSourceFile);
+      };
+
+      // Create program for type checking
+      const program = ts.createProgram([fileName], compilerOptions, host);
+      
+      // Get diagnostics (type errors)
+      const diagnostics = ts.getPreEmitDiagnostics(program);
 
       // Check for TypeScript errors
-      if (transpileResult.diagnostics && transpileResult.diagnostics.length > 0) {
-        const errors = transpileResult.diagnostics
+      if (diagnostics.length > 0) {
+        console.log('TypeScript diagnostics found:', diagnostics.length);
+        
+        const errors = diagnostics
           .filter(d => d.category === ts.DiagnosticCategory.Error)
           .map(diagnostic => {
             const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
             if (diagnostic.file && diagnostic.start !== undefined) {
               const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
-              // Adjust line number if type definitions are prepended
-              const adjustedLine = typeDefinitions 
-                ? Math.max(1, line - typeDefinitions.split('\n').length - 1)
-                : line;
-              return `Line ${adjustedLine + 1}, Column ${character + 1}: ${message}`;
+              // Adjust line number to account for wrapper function and type definitions
+              const typeDefLines = typeDefinitions ? typeDefinitions.split('\n').length : 0;
+              const wrapperLines = 3; // async function wrapper adds 3 lines
+              const adjustedLine = Math.max(1, line + 1 - typeDefLines - wrapperLines);
+              return `Line ${adjustedLine}, Col ${character + 1}: ${message}`;
             }
             return message;
           });
 
         if (errors.length > 0) {
-          throw new Error(`TypeScript Error:\n${errors.join('\n')}`);
+          throw new Error(`TypeScript Validation Error:\n\n${errors.join('\n\n')}`);
         }
       }
 
-      const jsCode = transpileResult.outputText;
+      // Transpile to JavaScript (without type checking, just syntax transformation)
+      const jsCode = ts.transpileModule(fullCode, {
+        compilerOptions: {
+          target: ts.ScriptTarget.ES2020,
+          module: ts.ModuleKind.None,
+        },
+      }).outputText;
 
       console.log("Original TypeScript code:", code);
       console.log("Transpiled JavaScript code:", jsCode);
