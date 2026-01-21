@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowLeft, Building2, Users, Settings, Loader2 } from "lucide-react";
+import { ArrowLeft, Building2, Users, Settings, Loader2, Workflow, Plus } from "lucide-react";
 
 export default function OrganizationDetailPage() {
   const router = useRouter();
@@ -33,6 +33,14 @@ export default function OrganizationDetailPage() {
 
   const { data: members, isLoading: isLoadingMembers } =
     trpc.organizations.getMembers.useQuery(
+      { organizationId: id },
+      {
+        enabled: !!id && !!organization,
+      }
+    );
+
+  const { data: workflows, isLoading: isLoadingWorkflows } =
+    trpc.workflows.list.useQuery(
       { organizationId: id },
       {
         enabled: !!id && !!organization,
@@ -82,7 +90,83 @@ export default function OrganizationDetailPage() {
         </div>
       </div>
 
+      <div className="mb-6">
+        <Link href={`/organizations/${id}/workflows/new`}>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            New Workflow
+          </Button>
+        </Link>
+      </div>
+
       <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Workflow className="h-5 w-5" />
+              Workflows
+            </CardTitle>
+            <CardDescription>
+              {isLoadingWorkflows ? (
+                "Loading..."
+              ) : (
+                <>
+                  {workflows?.length || 0} workflow
+                  {(workflows?.length || 0) !== 1 ? "s" : ""}
+                </>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingWorkflows ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !workflows || workflows.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground mb-4">
+                  No workflows yet
+                </p>
+                <Link href={`/organizations/${id}/workflows/new`}>
+                  <Button variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Workflow
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {workflows.map((workflow) => (
+                  <Link
+                    key={workflow.id}
+                    href={`/organizations/${id}/workflows/${workflow.id}`}
+                  >
+                    <div className="flex items-center justify-between p-3 rounded-md border hover:bg-accent transition-colors cursor-pointer">
+                      <div>
+                        <p className="font-medium">{workflow.name}</p>
+                        {workflow.description && (
+                          <p className="text-sm text-muted-foreground">
+                            {workflow.description}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          workflow.isActive
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+                        }`}
+                      >
+                        {workflow.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
