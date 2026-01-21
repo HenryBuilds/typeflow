@@ -8,6 +8,7 @@ import {
   triggerTypeEnum,
   type ExecutionStatus,
 } from "@/db/schema/executions";
+import { workflowExecutor } from "../services/workflow-executor";
 
 export const executionsRouter = router({
   // List executions for organization
@@ -244,6 +245,150 @@ export const executionsRouter = router({
         .returning();
 
       return log;
+    }),
+
+  // Execute workflow
+  run: organizationProcedure
+    .input(
+      z.object({
+        workflowId: z.string().uuid(),
+        triggerData: z.record(z.string(), z.unknown()).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Create execution record
+      const [execution] = await db
+        .insert(executions)
+        .values({
+          organizationId: ctx.organization.id,
+          workflowId: input.workflowId,
+          triggerType: "manual",
+          triggerData: input.triggerData,
+          status: "running",
+          startedAt: new Date(),
+        })
+        .returning();
+
+      try {
+        // Execute workflow
+        const result = await workflowExecutor.executeWorkflow(
+          input.workflowId,
+          ctx.organization.id,
+          input.triggerData
+        );
+
+        // Update execution with results
+        console.log("Workflow execution completed:", {
+          success: result.success,
+          nodeResults: result.nodeResults,
+          finalOutput: result.finalOutput,
+        });
+        
+        const [updated] = await db
+          .update(executions)
+          .set({
+            status: result.success ? "completed" : "failed",
+            result: result.finalOutput,
+            nodeResults: result.nodeResults,
+            completedAt: new Date(),
+            duration: Date.now() - execution.startedAt.getTime(),
+            error: result.error,
+          })
+          .where(eq(executions.id, execution.id))
+          .returning();
+
+        // Return the execution with nodeResults included
+        return {
+          ...updated,
+          nodeResults: result.nodeResults,
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Update execution with error
+        const [updated] = await db
+          .update(executions)
+          .set({
+            status: "failed",
+            error: errorMessage,
+            completedAt: new Date(),
+            duration: Date.now() - execution.startedAt.getTime(),
+          })
+          .where(eq(executions.id, execution.id))
+          .returning();
+
+        return updated;
+      }
+    }),
+
+  // Execute workflow up to a specific node
+  runUntilNode: organizationProcedure
+    .input(
+      z.object({
+        workflowId: z.string().uuid(),
+        nodeId: z.string().uuid(),
+        triggerData: z.record(z.string(), z.unknown()).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Create execution record
+      const [execution] = await db
+        .insert(executions)
+        .values({
+          organizationId: ctx.organization.id,
+          workflowId: input.workflowId,
+          triggerType: "manual",
+          triggerData: input.triggerData,
+          status: "running",
+          startedAt: new Date(),
+        })
+        .returning();
+
+      try {
+        // Execute workflow up to the specified node
+        const result = await workflowExecutor.executeUntilNode(
+          input.workflowId,
+          ctx.organization.id,
+          input.nodeId,
+          input.triggerData
+        );
+
+        // Update execution with results
+        const [updated] = await db
+          .update(executions)
+          .set({
+            status: result.success ? "completed" : "failed",
+            result: result.finalOutput,
+            nodeResults: result.nodeResults,
+            completedAt: new Date(),
+            duration: Date.now() - execution.startedAt.getTime(),
+            error: result.error,
+          })
+          .where(eq(executions.id, execution.id))
+          .returning();
+
+        // Return the execution with nodeResults included
+        return {
+          ...updated,
+          nodeResults: result.nodeResults,
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Update execution with error
+        const [updated] = await db
+          .update(executions)
+          .set({
+            status: "failed",
+            error: errorMessage,
+            completedAt: new Date(),
+            duration: Date.now() - execution.startedAt.getTime(),
+          })
+          .where(eq(executions.id, execution.id))
+          .returning();
+
+        return updated;
+      }
     }),
 });
 
