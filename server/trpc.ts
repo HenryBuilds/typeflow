@@ -34,6 +34,7 @@ export const organizationProcedure = protectedProcedure
     })
   )
   .use(async ({ ctx, input, next }) => {
+    // Check if organization exists
     const organization = await db.query.organizations.findFirst({
       where: eq(organizations.id, input.organizationId),
     });
@@ -45,10 +46,26 @@ export const organizationProcedure = protectedProcedure
       });
     }
 
+    // Check if user is a member of the organization
+    const membership = await db.query.organizationMembers.findFirst({
+      where: and(
+        eq(organizationMembers.organizationId, input.organizationId),
+        eq(organizationMembers.userId, ctx.userId!)
+      ),
+    });
+
+    if (!membership) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You are not a member of this organization",
+      });
+    }
+
     return next({
       ctx: {
         ...ctx,
         organization,
+        membership,
       },
     });
   });
