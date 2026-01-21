@@ -138,7 +138,7 @@ export const workflowsRouter = router({
         }),
         nodes: z.array(
           z.object({
-            id: z.string().uuid().optional(),
+            id: z.string().optional(), // Allow any string ID (temporary IDs from frontend)
             type: z.string(),
             label: z.string(),
             position: z.object({ x: z.number(), y: z.number() }),
@@ -148,9 +148,9 @@ export const workflowsRouter = router({
         ),
         connections: z.array(
           z.object({
-            id: z.string().uuid().optional(),
-            sourceNodeId: z.string().uuid(),
-            targetNodeId: z.string().uuid(),
+            id: z.string().optional(), // Allow any string ID (temporary IDs from frontend)
+            sourceNodeId: z.string(), // Will be mapped to UUID
+            targetNodeId: z.string(), // Will be mapped to UUID
             sourceHandle: z.string().optional(),
             targetHandle: z.string().optional(),
             dataMapping: z.record(z.string(), z.string()).optional(),
@@ -198,44 +198,51 @@ export const workflowsRouter = router({
         .delete(connections)
         .where(eq(connections.workflowId, workflowId));
 
-      // Insert new nodes
-      const insertedNodes = await db
-        .insert(nodes)
-        .values(
-          input.nodes.map((node) => ({
-            workflowId,
-            organizationId: ctx.organization.id,
-            type: node.type,
-            label: node.label,
-            position: node.position,
-            config: node.config,
-            executionOrder: node.executionOrder ?? 0,
-          }))
-        )
-        .returning();
+      // Insert new nodes (only if there are any)
+      let insertedNodes: Array<typeof nodes.$inferSelect> = [];
+      if (input.nodes.length > 0) {
+        const nodeValues = input.nodes.map((node) => ({
+          workflowId,
+          organizationId: ctx.organization.id,
+          type: node.type,
+          label: node.label,
+          position: node.position,
+          config: node.config || {},
+          executionOrder: node.executionOrder ?? 0,
+        }));
 
-      // Create node ID mapping
+        insertedNodes = await db.insert(nodes).values(nodeValues).returning();
+      }
+
+      // Create node ID mapping (for nodes that had temporary IDs)
       const nodeIdMap = new Map<string, string>();
       input.nodes.forEach((node, index) => {
-        if (node.id) {
-          nodeIdMap.set(node.id, insertedNodes[index].id);
+        if (insertedNodes[index]) {
+          const dbNodeId = insertedNodes[index].id;
+          // Map temporary ID to database ID, or use database ID as both key and value
+          if (node.id) {
+            nodeIdMap.set(node.id, dbNodeId);
+          }
+          // Also map database ID to itself for direct lookups
+          nodeIdMap.set(dbNodeId, dbNodeId);
         }
       });
 
-      // Insert connections with mapped node IDs
-      await db.insert(connections).values(
-        input.connections.map((conn) => ({
-          organizationId: ctx.organization.id,
-          workflowId,
-          sourceNodeId: nodeIdMap.get(conn.sourceNodeId) ?? conn.sourceNodeId,
-          targetNodeId: nodeIdMap.get(conn.targetNodeId) ?? conn.targetNodeId,
-          sourceHandle: conn.sourceHandle,
-          targetHandle: conn.targetHandle,
-          dataMapping: conn.dataMapping,
-        }))
-      );
+      // Insert connections with mapped node IDs (only if there are any)
+      if (input.connections.length > 0) {
+        await db.insert(connections).values(
+          input.connections.map((conn) => ({
+            organizationId: ctx.organization.id,
+            workflowId,
+            sourceNodeId: nodeIdMap.get(conn.sourceNodeId) ?? conn.sourceNodeId,
+            targetNodeId: nodeIdMap.get(conn.targetNodeId) ?? conn.targetNodeId,
+            sourceHandle: conn.sourceHandle,
+            targetHandle: conn.targetHandle,
+            dataMapping: conn.dataMapping,
+          }))
+        );
+      }
 
       return { id: workflowId };
     }),
 });
-
