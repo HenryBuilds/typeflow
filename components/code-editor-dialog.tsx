@@ -415,11 +415,59 @@ export function CodeEditorDialog({
     return [...baseVars, ...fieldVars];
   }, [inputFields]);
 
+  // Standard TypeScript types
+  const standardTypes = useMemo(() => [
+    // Primitive types
+    { name: 'string', kind: 'type', info: 'Primitive string type' },
+    { name: 'number', kind: 'type', info: 'Primitive number type' },
+    { name: 'boolean', kind: 'type', info: 'Primitive boolean type' },
+    { name: 'null', kind: 'type', info: 'Null type' },
+    { name: 'undefined', kind: 'type', info: 'Undefined type' },
+    { name: 'any', kind: 'type', info: 'Any type (no type checking)' },
+    { name: 'unknown', kind: 'type', info: 'Unknown type (type-safe any)' },
+    { name: 'void', kind: 'type', info: 'Void type (no return value)' },
+    { name: 'never', kind: 'type', info: 'Never type (unreachable)' },
+    
+    // Object types
+    { name: 'object', kind: 'type', info: 'Object type' },
+    { name: 'Object', kind: 'interface', info: 'Object constructor' },
+    { name: 'Record', kind: 'type', info: 'Record<K, V> - object with keys of type K and values of type V' },
+    { name: 'Partial', kind: 'type', info: 'Partial<T> - make all properties optional' },
+    { name: 'Required', kind: 'type', info: 'Required<T> - make all properties required' },
+    { name: 'Readonly', kind: 'type', info: 'Readonly<T> - make all properties readonly' },
+    { name: 'Pick', kind: 'type', info: 'Pick<T, K> - pick subset of properties' },
+    { name: 'Omit', kind: 'type', info: 'Omit<T, K> - omit subset of properties' },
+    
+    // Array types
+    { name: 'Array', kind: 'interface', info: 'Array<T> - array type' },
+    { name: 'ReadonlyArray', kind: 'interface', info: 'ReadonlyArray<T> - readonly array' },
+    
+    // Function types
+    { name: 'Function', kind: 'interface', info: 'Function type' },
+    
+    // Promise types
+    { name: 'Promise', kind: 'interface', info: 'Promise<T> - async operation result' },
+    
+    // Utility types
+    { name: 'Exclude', kind: 'type', info: 'Exclude<T, U> - exclude types from union' },
+    { name: 'Extract', kind: 'type', info: 'Extract<T, U> - extract types from union' },
+    { name: 'NonNullable', kind: 'type', info: 'NonNullable<T> - exclude null and undefined' },
+    { name: 'ReturnType', kind: 'type', info: 'ReturnType<T> - get function return type' },
+    { name: 'Parameters', kind: 'type', info: 'Parameters<T> - get function parameters' },
+    
+    // Other common types
+    { name: 'Date', kind: 'interface', info: 'Date object' },
+    { name: 'Error', kind: 'interface', info: 'Error object' },
+    { name: 'RegExp', kind: 'interface', info: 'Regular expression' },
+    { name: 'Map', kind: 'interface', info: 'Map<K, V> - key-value map' },
+    { name: 'Set', kind: 'interface', info: 'Set<T> - unique values set' },
+  ], []);
+
   // Parse type definitions to extract type names
   const definedTypes = useMemo(() => {
-    if (!typeDefinitions) return [];
-    
     const types: Array<{ name: string; kind: string; info: string }> = [];
+    
+    if (!typeDefinitions) return types;
     
     // Extract interface names: interface Name { ... }
     const interfaceRegex = /interface\s+([A-Z]\w*)/g;
@@ -466,6 +514,11 @@ export function CodeEditorDialog({
     
     return types;
   }, [typeDefinitions]);
+  
+  // Combine standard types with custom types (custom types get priority)
+  const allTypes = useMemo(() => {
+    return [...definedTypes, ...standardTypes];
+  }, [definedTypes, standardTypes]);
 
   // Custom autocomplete for variables and types
   const customAutocomplete = useMemo(() => {
@@ -493,7 +546,7 @@ export function CodeEditorDialog({
         },
         // Autocomplete for custom types - always show all types
         (context) => {
-          if (definedTypes.length === 0) return null;
+          if (allTypes.length === 0) return null;
           
           const line = context.state.doc.lineAt(context.pos);
           const lineStart = line.from;
@@ -516,15 +569,16 @@ export function CodeEditorDialog({
               const typedText = word.text.toLowerCase();
               return {
                 from: word.from,
-                options: definedTypes
+                options: allTypes
                   .filter(t => t.name.toLowerCase().startsWith(typedText))
                   .map(t => ({
                     label: t.name,
                     type: t.kind,
                     info: t.info,
-                    boost: 99,
+                    // Custom types get higher priority
+                    boost: definedTypes.some(dt => dt.name === t.name) ? 99 : 50,
                   })),
-                validFor: /^[A-Z][\w]*$/,
+                validFor: /^[\w]*$/,
               };
             }
           }
@@ -537,11 +591,12 @@ export function CodeEditorDialog({
             if (colonMatch || angleMatch) {
               return {
                 from: context.pos,
-                options: definedTypes.map(t => ({
+                options: allTypes.map(t => ({
                   label: t.name,
                   type: t.kind,
                   info: t.info,
-                  boost: 99,
+                  // Custom types get higher priority
+                  boost: definedTypes.some(dt => dt.name === t.name) ? 99 : 50,
                 })),
               };
             }
