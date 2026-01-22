@@ -19,12 +19,16 @@ import "reactflow/dist/style.css";
 import { CodeNode } from "./nodes/code-node";
 import { TriggerNode } from "./nodes/trigger-node";
 import { WorkflowNode } from "./nodes/workflow-node";
+import { WebhookNode } from "./nodes/webhook-node";
+import { WebhookResponseNode } from "./nodes/webhook-response-node";
 import { CodeEditorDialog } from "./code-editor-dialog";
 
 const nodeTypes: NodeTypes = {
   code: CodeNode,
   trigger: TriggerNode,
   workflow: WorkflowNode,
+  webhook: WebhookNode,
+  webhookResponse: WebhookResponseNode,
 };
 
 interface WorkflowEditorProps {
@@ -62,6 +66,7 @@ interface WorkflowEditorProps {
   executingNodeId?: string | null;
   typeDefinitions?: string;
   packageTypeDefinitions?: string; // Combined type definitions from packages
+  installedPackages?: Array<{ name: string; version: string }>; // List of installed packages
   nodeOutputs?: Record<
     string,
     {
@@ -71,6 +76,7 @@ interface WorkflowEditorProps {
       duration?: number;
     }
   >;
+  onWebhookEdit?: (nodeId: string, node: Node) => void; // Callback for webhook node edit
 }
 
 export function WorkflowEditor({ 
@@ -84,8 +90,14 @@ export function WorkflowEditor({
   executingNodeId,
   typeDefinitions,
   packageTypeDefinitions,
+  installedPackages = [],
   nodeOutputs,
+  onWebhookEdit,
 }: WorkflowEditorProps) {
+  // Debug logging
+  useEffect(() => {
+    console.log('WorkflowEditor received typeDefinitions:', typeDefinitions ? typeDefinitions.substring(0, 100) + '...' : 'empty/undefined');
+  }, [typeDefinitions]);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] =
     useState<ReactFlowInstance | null>(null);
@@ -290,6 +302,47 @@ export function WorkflowEditor({
           },
         };
       }
+      if (node.type === "webhook") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onWebhookEdit) {
+                onWebhookEdit(nodeId, node);
+              } else {
+                setEditingNodeId(nodeId);
+                setEditingNode(node);
+              }
+            },
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            webhookUrl: node.data.config?.path
+              ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/${workflow.id}/${node.data.config.path}`
+              : undefined,
+          },
+        };
+      }
+      if (node.type === "webhookResponse") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              setEditingNodeId(nodeId);
+              setEditingNode(node);
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
       return {
         ...node,
         data: {
@@ -390,7 +443,7 @@ export function WorkflowEditor({
         y: event.clientY,
       });
 
-      const baseLabel = type === "trigger" ? "Trigger" : type === "code" ? "Code Node" : "Node";
+      const baseLabel = type === "trigger" ? "Trigger" : type === "code" ? "Code Node" : type === "webhook" ? "Webhook" : type === "webhookResponse" ? "Webhook Response" : "Node";
       const uniqueLabel = generateUniqueLabel(baseLabel, nodes);
 
       // Generate a proper UUID for the node
@@ -453,7 +506,7 @@ export function WorkflowEditor({
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
         </ReactFlow>
       </div>
-      {editingNode && editingNodeId && (() => {
+      {editingNode && editingNodeId && (editingNode.type === "code" || editingNode.type === "webhookResponse") && (() => {
         // Get the latest node data with inputData from nodesWithHandlers
         const latestNode = nodesWithHandlers.find(n => n.id === editingNodeId);
         const nodeInputData = latestNode?.data?.inputData || editingNode.data.inputData;
@@ -469,6 +522,8 @@ export function WorkflowEditor({
           });
         }
         
+        const defaultLabel = editingNode.type === "webhookResponse" ? "Webhook Response" : "Code Node";
+        
         return (
           <CodeEditorDialog
             open={!!editingNodeId}
@@ -480,11 +535,12 @@ export function WorkflowEditor({
             }}
             nodeId={editingNodeId || ""}
             initialCode={(editingNode.data.config?.code as string) || ""}
-            initialLabel={editingNode.data.label || "Code Node"}
+            initialLabel={editingNode.data.label || defaultLabel}
             inputData={nodeInputData}
             sourceNodeLabels={sourceNodeLabels}
             typeDefinitions={typeDefinitions}
             packageTypeDefinitions={packageTypeDefinitions}
+            installedPackages={installedPackages}
             existingNodeLabels={nodes
               .filter(n => n.id !== editingNodeId)
               .map(n => n.data?.label?.toString().trim())
