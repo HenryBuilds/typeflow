@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { router, organizationProcedure } from "../trpc";
 import { db } from "@/db/db";
-import { webhooks } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { webhooks, webhookRequests } from "@/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 export const webhooksRouter = router({
   // List all webhooks in organization
@@ -135,6 +135,31 @@ export const webhooksRouter = router({
         );
 
       return { success: true };
+    }),
+
+  // Get latest captured request
+  getLatestRequest: organizationProcedure
+    .input(z.object({ webhookId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Verify webhook belongs to organization
+      const webhook = await db.query.webhooks.findFirst({
+        where: and(
+          eq(webhooks.id, input.webhookId),
+          eq(webhooks.organizationId, ctx.organization.id)
+        ),
+      });
+
+      if (!webhook) {
+        throw new Error("Webhook not found");
+      }
+
+      // Get latest request from database
+      const latestRequest = await db.query.webhookRequests.findFirst({
+        where: eq(webhookRequests.webhookId, input.webhookId),
+        orderBy: [desc(webhookRequests.receivedAt)],
+      });
+
+      return latestRequest || null;
     }),
 });
 
