@@ -11,6 +11,7 @@ export * from "./packages";
 export * from "./executions";
 export * from "./logs";
 export * from "./webhooks";
+export * from "./webhook-requests";
 export * from "./environments";
 
 // Import tables for relations
@@ -23,6 +24,7 @@ import { connections } from "./connections";
 import { executions } from "./executions";
 import { logs } from "./logs";
 import { webhooks } from "./webhooks";
+import { webhookRequests } from "./webhook-requests";
 import { packages } from "./packages";
 import { environments } from "./environments";
 
@@ -132,7 +134,7 @@ export const logsRelations = relations(logs, ({ one }) => ({
   }),
 }));
 
-export const webhooksRelations = relations(webhooks, ({ one }) => ({
+export const webhooksRelations = relations(webhooks, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [webhooks.organizationId],
     references: [organizations.id],
@@ -140,6 +142,14 @@ export const webhooksRelations = relations(webhooks, ({ one }) => ({
   workflow: one(workflows, {
     fields: [webhooks.workflowId],
     references: [workflows.id],
+  }),
+  requests: many(webhookRequests),
+}));
+
+export const webhookRequestsRelations = relations(webhookRequests, ({ one }) => ({
+  webhook: one(webhooks, {
+    fields: [webhookRequests.webhookId],
+    references: [webhooks.id],
   }),
 }));
 
@@ -173,6 +183,9 @@ export type NewLog = InferInsertModel<typeof logs>;
 
 export type Webhook = InferSelectModel<typeof webhooks>;
 export type NewWebhook = InferInsertModel<typeof webhooks>;
+
+export type WebhookRequest = InferSelectModel<typeof webhookRequests>;
+export type NewWebhookRequest = InferInsertModel<typeof webhookRequests>;
 
 export type Environment = InferSelectModel<typeof environments>;
 export type NewEnvironment = InferInsertModel<typeof environments>;
