@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
-import { oneDark } from "@codemirror/theme-one-dark";
+import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { autocompletion, completionKeymap, acceptCompletion } from "@codemirror/autocomplete";
 import { keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
@@ -30,6 +30,7 @@ interface CodeEditorDialogProps {
   sourceNodeLabels?: Record<string, string>; // Map of nodeId to label
   typeDefinitions?: string; // Global type definitions
   packageTypeDefinitions?: string; // Type definitions from installed packages
+  installedPackages?: Array<{ name: string; version: string }>; // List of installed packages
   existingNodeLabels?: string[]; // List of existing node labels for uniqueness check
   onSave: (data: { code: string; label: string }) => void;
 }
@@ -44,6 +45,7 @@ export function CodeEditorDialog({
   sourceNodeLabels,
   typeDefinitions,
   packageTypeDefinitions,
+  installedPackages = [],
   existingNodeLabels = [],
   onSave,
 }: CodeEditorDialogProps) {
@@ -467,62 +469,110 @@ export function CodeEditorDialog({
     { name: 'Set', kind: 'interface', info: 'Set<T> - unique values set' },
   ], []);
 
-  // Parse type definitions to extract type names
-  const definedTypes = useMemo(() => {
+  // Helper function to parse type definitions
+  const parseTypes = useCallback((source: string, sourceLabel: string) => {
     const types: Array<{ name: string; kind: string; info: string }> = [];
     
-    if (!typeDefinitions) return types;
+    if (!source) return types;
     
     // Extract interface names: interface Name { ... }
-    const interfaceRegex = /interface\s+([A-Z]\w*)/g;
+    const interfaceRegex = /(?:export\s+)?interface\s+([A-Z_]\w*)/gi;
     let match;
-    while ((match = interfaceRegex.exec(typeDefinitions)) !== null) {
-      types.push({
-        name: match[1],
-        kind: 'interface',
-        info: `Interface ${match[1]} (from global types)`,
-      });
+    while ((match = interfaceRegex.exec(source)) !== null) {
+      const name = match[1];
+      // Avoid duplicates
+      if (!types.some(t => t.name === name)) {
+        types.push({
+          name,
+          kind: 'interface',
+          info: `Interface ${name} (${sourceLabel})`,
+        });
+      }
     }
     
     // Extract type names: type Name = ...
-    const typeRegex = /type\s+([A-Z]\w*)\s*=/g;
-    while ((match = typeRegex.exec(typeDefinitions)) !== null) {
-      types.push({
-        name: match[1],
-        kind: 'type',
-        info: `Type ${match[1]} (from global types)`,
-      });
+    const typeRegex = /(?:export\s+)?type\s+([A-Z_]\w*)(?:\s*<[^>]*>)?\s*=/gi;
+    while ((match = typeRegex.exec(source)) !== null) {
+      const name = match[1];
+      if (!types.some(t => t.name === name)) {
+        types.push({
+          name,
+          kind: 'type',
+          info: `Type ${name} (${sourceLabel})`,
+        });
+      }
     }
     
     // Extract enum names: enum Name { ... }
-    const enumRegex = /enum\s+([A-Z]\w*)/g;
-    while ((match = enumRegex.exec(typeDefinitions)) !== null) {
-      types.push({
-        name: match[1],
-        kind: 'enum',
-        info: `Enum ${match[1]} (from global types)`,
-      });
+    const enumRegex = /(?:export\s+)?(?:const\s+)?enum\s+([A-Z_]\w*)/gi;
+    while ((match = enumRegex.exec(source)) !== null) {
+      const name = match[1];
+      if (!types.some(t => t.name === name)) {
+        types.push({
+          name,
+          kind: 'enum',
+          info: `Enum ${name} (${sourceLabel})`,
+        });
+      }
     }
     
     // Extract class names: class Name { ... }
-    const classRegex = /class\s+([A-Z]\w*)/g;
-    while ((match = classRegex.exec(typeDefinitions)) !== null) {
-      types.push({
-        name: match[1],
-        kind: 'class',
-        info: `Class ${match[1]} (from global types)`,
-      });
+    const classRegex = /(?:export\s+)?(?:abstract\s+)?class\s+([A-Z_]\w*)/gi;
+    while ((match = classRegex.exec(source)) !== null) {
+      const name = match[1];
+      if (!types.some(t => t.name === name)) {
+        types.push({
+          name,
+          kind: 'class',
+          info: `Class ${name} (${sourceLabel})`,
+        });
+      }
     }
     
-    console.log('Parsed types from definitions:', types);
+    // Extract namespace/module names: namespace Name { ... } or declare module 'name' { ... }
+    const namespaceRegex = /(?:export\s+)?(?:declare\s+)?namespace\s+([A-Z_]\w*)/gi;
+    while ((match = namespaceRegex.exec(source)) !== null) {
+      const name = match[1];
+      if (!types.some(t => t.name === name)) {
+        types.push({
+          name,
+          kind: 'namespace',
+          info: `Namespace ${name} (${sourceLabel})`,
+        });
+      }
+    }
     
     return types;
-  }, [typeDefinitions]);
+  }, []);
+
+  // Parse type definitions to extract type names
+  const definedTypes = useMemo(() => {
+    console.log('Type definitions source:', typeDefinitions ? typeDefinitions.substring(0, 100) + '...' : 'empty');
+    const customTypes = parseTypes(typeDefinitions || '', 'global types');
+    console.log('Parsed custom types:', customTypes.length, 'types:', customTypes.map(t => t.name).join(', '));
+    return customTypes;
+  }, [typeDefinitions, parseTypes]);
   
-  // Combine standard types with custom types (custom types get priority)
+  // Parse package type definitions
+  const packageTypes = useMemo(() => {
+    const pkgTypes = parseTypes(packageTypeDefinitions || '', 'installed packages');
+    console.log('Parsed package types:', pkgTypes.length, 'types');
+    return pkgTypes;
+  }, [packageTypeDefinitions, parseTypes]);
+  
+  // Combine all types: custom types, package types, then standard types (in priority order)
   const allTypes = useMemo(() => {
-    return [...definedTypes, ...standardTypes];
-  }, [definedTypes, standardTypes]);
+    // Remove duplicates, prioritizing earlier types (custom > package > standard)
+    const seen = new Set<string>();
+    const combined = [...definedTypes, ...packageTypes, ...standardTypes].filter(t => {
+      if (seen.has(t.name)) return false;
+      seen.add(t.name);
+      return true;
+    });
+    
+    console.log('All types for autocomplete:', combined.length, 'types');
+    return combined;
+  }, [definedTypes, packageTypes, standardTypes]);
 
   // Combine type definitions with package type definitions
   const combinedTypeDefinitions = useMemo(() => {
@@ -561,7 +611,7 @@ export function CodeEditorDialog({
             validFor: /^\$[\w_]*$/,
           };
         },
-        // Autocomplete for custom types - always show all types
+        // Autocomplete for custom types - show types in type positions
         (context) => {
           if (allTypes.length === 0) return null;
           
@@ -569,54 +619,103 @@ export function CodeEditorDialog({
           const lineStart = line.from;
           const textBefore = line.text.slice(0, context.pos - lineStart);
           
-          // Try to match any word starting with uppercase
-          const word = context.matchBefore(/[A-Z][\w]*/);
+          // Check for type position patterns (after : < as extends implements)
+          const isAfterColon = /:\s*\w*$/.test(textBefore);
+          const isAfterAngle = /<\s*\w*$/.test(textBefore);
+          const isAfterAs = /\bas\s+\w*$/.test(textBefore);
+          const isAfterExtends = /\bextends\s+\w*$/.test(textBefore);
+          const isAfterImplements = /\bimplements\s+\w*$/.test(textBefore);
           
-          // If we have a word, check if it's in a type position
-          if (word && word.text.length > 0) {
-            const textBeforeWord = textBefore.slice(0, word.from - lineStart);
-            const isTypePosition = 
-              /:\s*$/.test(textBeforeWord) ||
-              /<\s*$/.test(textBeforeWord) ||
-              /\bas\s+$/.test(textBeforeWord) ||
-              /\bextends\s+$/.test(textBeforeWord) ||
-              /\bimplements\s+$/.test(textBeforeWord);
+          const isTypePosition = isAfterColon || isAfterAngle || isAfterAs || isAfterExtends || isAfterImplements;
+          
+          if (isTypePosition) {
+            // Try to match what the user has typed so far (could be lowercase or uppercase)
+            const word = context.matchBefore(/\w+/);
             
-            if (isTypePosition) {
-              const typedText = word.text.toLowerCase();
+            if (word || context.explicit) {
+              const typedText = word ? word.text.toLowerCase() : '';
+              const from = word ? word.from : context.pos;
+              
               return {
-                from: word.from,
+                from,
                 options: allTypes
-                  .filter(t => t.name.toLowerCase().startsWith(typedText))
+                  .filter(t => !typedText || t.name.toLowerCase().startsWith(typedText))
                   .map(t => ({
                     label: t.name,
                     type: t.kind,
                     info: t.info,
-                    // Custom types get higher priority
-                    boost: definedTypes.some(dt => dt.name === t.name) ? 99 : 50,
+                    // Priority: custom types (99) > package types (80) > standard types (50)
+                    boost: definedTypes.some(dt => dt.name === t.name) ? 99 : 
+                           packageTypes.some(pt => pt.name === t.name) ? 80 : 50,
                   })),
-                validFor: /^[\w]*$/,
+                validFor: /^\w*$/,
               };
             }
           }
           
-          // If explicit (Ctrl+Space), show types after : or <
+          // For explicit trigger (Ctrl+Space) anywhere
           if (context.explicit) {
-            const colonMatch = textBefore.match(/:\s*$/);
-            const angleMatch = textBefore.match(/<\s*$/);
+            const word = context.matchBefore(/\w*/);
+            const typedText = word ? word.text.toLowerCase() : '';
+            const from = word && word.text ? word.from : context.pos;
             
-            if (colonMatch || angleMatch) {
-              return {
-                from: context.pos,
-                options: allTypes.map(t => ({
+            return {
+              from,
+              options: allTypes
+                .filter(t => !typedText || t.name.toLowerCase().startsWith(typedText))
+                .map(t => ({
                   label: t.name,
                   type: t.kind,
                   info: t.info,
-                  // Custom types get higher priority
-                  boost: definedTypes.some(dt => dt.name === t.name) ? 99 : 50,
+                  boost: definedTypes.some(dt => dt.name === t.name) ? 99 : 
+                         packageTypes.some(pt => pt.name === t.name) ? 80 : 50,
                 })),
-              };
-            }
+              validFor: /^\w*$/,
+            };
+          }
+          
+          return null;
+        },
+        // Autocomplete for import statements - suggest installed packages
+        (context) => {
+          if (installedPackages.length === 0) return null;
+          
+          const line = context.state.doc.lineAt(context.pos);
+          const lineText = line.text;
+          
+          // Check if we're in an import statement
+          const importMatch = lineText.match(/^import\s+.*\s+from\s+['"]([^'"]*)/);
+          if (importMatch) {
+            const packagePrefix = importMatch[1].toLowerCase();
+            const quotePos = lineText.lastIndexOf(importMatch[1]);
+            const from = line.from + quotePos;
+            
+            return {
+              from,
+              options: installedPackages
+                .filter(pkg => pkg.name.toLowerCase().startsWith(packagePrefix))
+                .map(pkg => ({
+                  label: pkg.name,
+                  type: 'text',
+                  info: `v${pkg.version} (installed)`,
+                  detail: 'installed package',
+                })),
+              validFor: /^[\w@\/-]*$/,
+            };
+          }
+          
+          // Also trigger after typing 'from "' or "from '"
+          const fromMatch = lineText.match(/from\s+['"]$/);
+          if (fromMatch && context.pos === line.from + lineText.length) {
+            return {
+              from: context.pos,
+              options: installedPackages.map(pkg => ({
+                label: pkg.name,
+                type: 'text',
+                info: `v${pkg.version} (installed)`,
+                detail: 'installed package',
+              })),
+            };
           }
           
           return null;
@@ -680,7 +779,7 @@ export function CodeEditorDialog({
         },
       ],
     });
-  }, [availableVariables, buildTree, definedTypes]);
+  }, [availableVariables, buildTree, allTypes, definedTypes, packageTypes, installedPackages]);
 
   useEffect(() => {
     if (open) {
@@ -873,16 +972,33 @@ export function CodeEditorDialog({
               <div className="px-6 py-3 border-b bg-background/50 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Label className="text-sm font-medium">TypeScript Code</Label>
-                  <span className="text-xs text-muted-foreground">Use Ctrl+Space for autocomplete</span>
+                  <span className="text-xs text-muted-foreground">Autocomplete: Ctrl+Space or type after <code className="px-1">:</code></span>
                 </div>
-                {typeDefinitions && definedTypes.length > 0 && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                    <FileType className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                    <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                      {definedTypes.length} type{definedTypes.length !== 1 ? 's' : ''}: {definedTypes.map(t => t.name).join(', ')}
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  {typeDefinitions && definedTypes.length > 0 ? (
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                      <FileType className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                        {definedTypes.length} custom type{definedTypes.length !== 1 ? 's' : ''}: {definedTypes.slice(0, 3).map(t => t.name).join(', ')}{definedTypes.length > 3 ? '...' : ''}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                      <FileType className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
+                      <span className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">
+                        No custom types defined
+                      </span>
+                    </div>
+                  )}
+                  {packageTypeDefinitions && packageTypes.length > 0 && (
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md">
+                      <FileType className="h-3 w-3 text-green-600 dark:text-green-400" />
+                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                        {packageTypes.length} package type{packageTypes.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div 
                 className="flex-1 overflow-hidden relative mx-6 mb-4"
@@ -919,7 +1035,7 @@ export function CodeEditorDialog({
                       { key: "Tab", run: acceptCompletion },
                     ]),
                   ]}
-                  theme={oneDark}
+                  theme={vscodeDark}
                   onChange={(value) => setCode(value)}
                   onUpdate={(view) => {
                     if (view && !editorViewRef.current) {

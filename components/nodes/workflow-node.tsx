@@ -1,9 +1,15 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Handle, Position, NodeProps } from "reactflow";
-import { Workflow, Play, CheckCircle2, XCircle, Loader2, Trash2 } from "lucide-react";
+import { Workflow, Play, CheckCircle2, XCircle, Loader2, Trash2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface WorkflowNodeData {
   label?: string;
@@ -15,6 +21,8 @@ interface WorkflowNodeData {
 }
 
 export const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNodeData>) => {
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  
   // Determine border and background color based on execution status
   const getStatusStyles = () => {
     if (data.executionStatus === "completed") {
@@ -37,7 +45,21 @@ export const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNode
       return <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />;
     }
     if (data.executionStatus === "failed") {
-      return <XCircle className="h-3.5 w-3.5 text-red-500" />;
+      return (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-5 w-5 p-0 hover:bg-red-100 dark:hover:bg-red-950/30"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowErrorDialog(true);
+          }}
+          title="View error details"
+        >
+          <XCircle className="h-3.5 w-3.5 text-red-500" />
+        </Button>
+      );
     }
     if (data.executionStatus === "running" || data.isExecuting) {
       return <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />;
@@ -90,19 +112,6 @@ export const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNode
         </div>
       </div>
       
-      {/* Show error message */}
-      {data.errorMessage && (
-        <div className="mt-2 p-2 bg-red-100 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded text-xs text-red-700 dark:text-red-400">
-          <div className="font-semibold mb-1 flex items-center gap-1">
-            <XCircle className="h-3 w-3" />
-            Error:
-          </div>
-          <div className="whitespace-pre-wrap break-words max-h-24 overflow-auto">
-            {data.errorMessage}
-          </div>
-        </div>
-      )}
-      
       <Handle
         type="target"
         position={Position.Top}
@@ -113,6 +122,32 @@ export const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNode
         position={Position.Bottom}
         className="w-3 h-3 !bg-green-500"
       />
+      
+      {/* Error Details Dialog */}
+      <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <AlertCircle className="h-5 w-5" />
+              Execution Error
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Node:</h4>
+                <p className="text-sm text-muted-foreground">{data.label || "Node"}</p>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Error Message:</h4>
+                <pre className="text-xs font-mono bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded p-3 overflow-auto max-h-96 whitespace-pre-wrap break-words text-red-700 dark:text-red-400">
+                  {data.errorMessage || "Unknown error"}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });
