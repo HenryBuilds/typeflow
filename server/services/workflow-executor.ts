@@ -93,13 +93,13 @@ export class WorkflowExecutor {
     // Add target node to execution list
     predecessors.add(targetNodeId);
 
-    // Find trigger node
-    const triggerNode = workflow.nodes.find((n) => n.type === "trigger") || workflow.nodes[0];
+    // Find trigger or webhook node
+    const triggerNode = workflow.nodes.find((n) => n.type === "trigger" || n.type === "webhook") || workflow.nodes[0];
     if (!triggerNode) {
-      throw new Error("No trigger node found");
+      throw new Error("No trigger or webhook node found");
     }
 
-    // Ensure trigger is in predecessors
+    // Ensure trigger/webhook is in predecessors
     predecessors.add(triggerNode.id);
 
     // Execute nodes in topological order (BFS from trigger)
@@ -135,7 +135,7 @@ export class WorkflowExecutor {
       try {
         let inputItems: ExecutionItem[] = [];
 
-        if (currentNode.type === "trigger") {
+        if (currentNode.type === "trigger" || currentNode.type === "webhook") {
           inputItems = triggerData ? [{ json: triggerData }] : [{ json: {} }];
         } else {
           const inputConnections = workflowConnections.filter(c => c.targetNodeId === currentNodeId);
@@ -163,7 +163,7 @@ export class WorkflowExecutor {
 
         let outputItems: ExecutionItem[] = [];
 
-        if (currentNode.type === "code") {
+        if (currentNode.type === "code" || currentNode.type === "webhookResponse") {
           const predecessorOutputs = new Map<string, { nodeLabel: string; output: ExecutionItem[] }>();
           const visitedPredecessors = new Set<string>();
           const predecessorQueue = [currentNodeId];
@@ -191,8 +191,8 @@ export class WorkflowExecutor {
           }
           
           outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, organizationId, typeDefinitions);
-          console.log(`Code node ${currentNodeId} returned ${outputItems.length} items`);
-        } else if (currentNode.type === "trigger") {
+          console.log(`${currentNode.type === "webhookResponse" ? "Webhook Response" : "Code"} node ${currentNodeId} returned ${outputItems.length} items`);
+        } else if (currentNode.type === "trigger" || currentNode.type === "webhook") {
           outputItems = inputItems;
         } else {
           outputItems = inputItems;
@@ -285,12 +285,12 @@ export class WorkflowExecutor {
     const nodeOutputs = new Map<string, ExecutionItem[]>(); // Array of execution items per node
     const nodeResults: Record<string, NodeExecutionResult> = {};
 
-    // Find trigger node (first node or node with type "trigger")
+    // Find trigger or webhook node (first node or node with type "trigger" or "webhook")
     const triggerNode =
-      workflow.nodes.find((n) => n.type === "trigger") || workflow.nodes[0];
+      workflow.nodes.find((n) => n.type === "trigger" || n.type === "webhook") || workflow.nodes[0];
 
     if (!triggerNode) {
-      throw new Error("No trigger node found");
+      throw new Error("No trigger or webhook node found");
     }
 
     // Execute nodes in order
@@ -317,7 +317,7 @@ export class WorkflowExecutor {
         let inputItems: ExecutionItem[] = [];
 
         // Convert trigger data to items format
-        if (currentNode.type === "trigger") {
+        if (currentNode.type === "trigger" || currentNode.type === "webhook") {
           inputItems = triggerData ? [{ json: triggerData }] : [{ json: {} }];
         } else {
           // Get input from connected nodes
@@ -356,7 +356,7 @@ export class WorkflowExecutor {
         let outputItems: ExecutionItem[] = [];
 
         // Execute node based on type
-        if (currentNode.type === "code") {
+        if (currentNode.type === "code" || currentNode.type === "webhookResponse") {
           // Find all predecessor nodes and their outputs
           const predecessorOutputs = new Map<string, { nodeLabel: string; output: ExecutionItem[] }>();
           const visitedPredecessors = new Set<string>();
@@ -387,9 +387,9 @@ export class WorkflowExecutor {
           
           outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, organizationId, typeDefinitions);
           console.log(
-            `Code node ${currentNodeId} returned ${outputItems.length} items`
+            `${currentNode.type === "webhookResponse" ? "Webhook Response" : "Code"} node ${currentNodeId} returned ${outputItems.length} items`
           );
-        } else if (currentNode.type === "trigger") {
+        } else if (currentNode.type === "trigger" || currentNode.type === "webhook") {
           outputItems = inputItems; // Trigger just passes through
         } else {
           // Generic node - just pass through
@@ -463,12 +463,49 @@ export class WorkflowExecutor {
     }
 
     try {
+      // Extract import statements from user code
+      const importRegex = /^import\s+.+\s+from\s+['"].+['"];?\s*$/gm;
+      const imports = code.match(importRegex) || [];
+      const codeWithoutImports = code.replace(importRegex, '').trim();
+
+      // Convert imports to require statements for runtime
+      const requireStatements = imports.map(importStmt => {
+        // Handle: import defaultExport from "module"
+        const defaultMatch = importStmt.match(/import\s+(\w+)\s+from\s+['"](.+)['"]/);
+        if (defaultMatch && !importStmt.includes('{')) {
+          return `const ${defaultMatch[1]} = require('${defaultMatch[2]}');`;
+        }
+        
+        // Handle: import { named } from "module"
+        const namedMatch = importStmt.match(/import\s+\{([^}]+)\}\s+from\s+['"](.+)['"]/);
+        if (namedMatch) {
+          const names = namedMatch[1].trim();
+          const module = namedMatch[2];
+          return `const { ${names} } = require('${module}');`;
+        }
+        
+        // Handle: import * as name from "module"
+        const namespaceMatch = importStmt.match(/import\s+\*\s+as\s+(\w+)\s+from\s+['"](.+)['"]/);
+        if (namespaceMatch) {
+          return `const ${namespaceMatch[1]} = require('${namespaceMatch[2]}');`;
+        }
+        
+        return importStmt;
+      }).join('\n');
+
       // Prepend type definitions to code if provided
       const fullCode = typeDefinitions 
         ? `${typeDefinitions}\n\n${code}`
         : code;
 
       // Add global declarations for runtime functions
+      let predecessorDeclarations = '';
+      predecessorOutputs.forEach((data, nodeId) => {
+        const sanitizedLabel = data.nodeLabel.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^[0-9]/, '_$&');
+        const varName = `$${sanitizedLabel}`;
+        predecessorDeclarations += `declare const ${varName}: { json: any; input: any[] };\n`;
+      });
+
       const globalDeclarations = `
 declare function require(moduleName: string): any;
 declare const console: {
@@ -476,15 +513,22 @@ declare const console: {
   error(...args: any[]): void;
   warn(...args: any[]): void;
 };
+declare const $input: any[];
+declare const $json: any;
+declare const $inputItem: any;
+declare const $inputAll: any[];
+${predecessorDeclarations}
 `;
 
-      // Wrap code in async function for type checking (same as runtime execution)
+      // Wrap code in async function for type checking
+      // Place imports at top level, then wrap the rest in a function
       const wrappedCodeForTypeCheck = `
         ${globalDeclarations}
         ${typeDefinitions || ''}
+        ${imports.join('\n')}
         
         async function __userCode__() {
-          ${code}
+          ${codeWithoutImports}
         }
       `;
 
@@ -533,18 +577,37 @@ declare const console: {
 
       // Check for TypeScript errors
       if (diagnostics.length > 0) {
-        console.log('TypeScript diagnostics found:', diagnostics.length);
+        
+        // Filter out module-related errors and runtime wrapper errors
+        const skipErrorPatterns = [
+          "Cannot find module",
+          "Cannot find name 'require'",
+          "has no exported member",
+          "is not a module",
+          "Cannot redeclare",
+          "Duplicate identifier",
+          "Top-level 'await'",
+          "'await' expressions are only allowed",
+          "'return' statement can only be used",
+          "A 'return' statement can only be used",
+        ];
         
         const errors = diagnostics
           .filter(d => d.category === ts.DiagnosticCategory.Error)
+          .filter(diagnostic => {
+            const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+            // Skip errors that are expected - code is wrapped at runtime
+            return !skipErrorPatterns.some(pattern => message.includes(pattern));
+          })
           .map(diagnostic => {
             const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
             if (diagnostic.file && diagnostic.start !== undefined) {
               const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
-              // Adjust line number to account for wrapper function and type definitions
+              // Adjust line number to account for wrapper function, imports, and type definitions
               const typeDefLines = typeDefinitions ? typeDefinitions.split('\n').length : 0;
-              const wrapperLines = 3; // async function wrapper adds 3 lines
-              const adjustedLine = Math.max(1, line + 1 - typeDefLines - wrapperLines);
+              const importLines = imports.length;
+              const wrapperLines = 3; // async function wrapper adds ~3 lines
+              const adjustedLine = Math.max(1, line + 1 - typeDefLines - importLines - wrapperLines);
               return `Line ${adjustedLine}, Col ${character + 1}: ${message}`;
             }
             return message;
@@ -556,16 +619,22 @@ declare const console: {
       }
 
       // Transpile to JavaScript (without type checking, just syntax transformation)
-      const jsCode = ts.transpileModule(fullCode, {
+      // Use the code with require statements instead of imports
+      const codeForExecution = requireStatements 
+        ? `${requireStatements}\n\n${codeWithoutImports}`
+        : code;
+        
+      // DO NOT include type definitions in transpiled code - they only exist at compile time
+      // and will cause runtime errors if included
+      // Transpile code WITHOUT imports/requires for execution
+      // The imports are already converted to require statements and stored separately
+      const transpileResult = ts.transpileModule(codeWithoutImports, {
         compilerOptions: {
           target: ts.ScriptTarget.ES2020,
-          module: ts.ModuleKind.None,
+          module: ts.ModuleKind.CommonJS,
         },
-      }).outputText;
-
-      console.log("Original TypeScript code:", code);
-      console.log("Transpiled JavaScript code:", jsCode);
-      console.log("Input items count:", inputItems.length);
+      });
+      const jsCodeWithoutRequires = transpileResult.outputText.trim();
 
       // Create a safe execution context with timeout
       const executeWithTimeout = async (
@@ -635,11 +704,14 @@ declare const console: {
             
             // Code receives $input (items array) and should return items array
             // Provide convenience variables for accessing previous node's output
+            // Use the transpiled JavaScript code (without TypeScript syntax like generics)
             const wrappedCode = `
+              ${requireStatements}
+              
               return (async function(${paramNames.join(", ")}) {
                 ${convenienceVarsCode}
                 
-                ${code}
+                ${jsCodeWithoutRequires}
               })(${paramNames.map((_, i) => `arguments[${i}]`).join(", ")});
             `;
 
@@ -648,19 +720,18 @@ declare const console: {
             Promise.resolve(fn(...paramValues))
               .then((result) => {
                 clearTimeout(timeout);
-                console.log("Code execution result:", result);
-                console.log("Result type:", typeof result);
-                console.log("Is array?", Array.isArray(result));
 
                 // Handle different return types
                 let outputItems: ExecutionItem[] = [];
 
-                if (result === undefined || result === null) {
-                  // No return statement - pass through input items
-                  console.log(
-                    "No return statement, passing through input items"
-                  );
-                  outputItems = inputItems;
+                // Check if the user code explicitly checked for undefined/null and returned it
+                // In that case, we should still respect it as a value, not pass through
+                if (result === undefined) {
+                  // Check if it's a primitive undefined return (code returned undefined)
+                  // In this case, we should treat it as a value, not pass through
+                  outputItems = [{ json: { value: null } }];
+                } else if (result === null) {
+                  outputItems = [{ json: { value: null } }];
                 } else if (Array.isArray(result)) {
                   // Array returned - check if it's items array or plain array
                   if (result.length > 0 && result[0]?.json !== undefined) {
@@ -683,12 +754,10 @@ declare const console: {
                   outputItems = [{ json: { value: result } }];
                 }
 
-                console.log(`Returning ${outputItems.length} output items`);
                 resolve(outputItems);
               })
               .catch((error) => {
                 clearTimeout(timeout);
-                console.error("Code execution error:", error);
                 reject(error);
               });
           } catch (error) {
@@ -698,7 +767,7 @@ declare const console: {
         });
       };
 
-      const result = await executeWithTimeout(jsCode, 5000);
+      const result = await executeWithTimeout(jsCodeWithoutRequires, 5000);
       return result;
     } catch (error) {
       throw new Error(
