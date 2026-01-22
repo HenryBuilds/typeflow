@@ -5,11 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
+import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
 import { TypeDefinitionsDialog } from "@/components/type-definitions-dialog";
 import { PackagesDialog } from "@/components/packages-dialog";
+import { WebhookDialog } from "@/components/webhook-dialog";
 import { useSaveWorkflow } from "@/hooks/use-workflows";
 import { Node, Edge } from "reactflow";
 
@@ -44,6 +46,10 @@ export default function WorkflowEditorPage() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [typeDefinitionsOpen, setTypeDefinitionsOpen] = useState(false);
   const [packagesDialogOpen, setPackagesDialogOpen] = useState(false);
+  const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
+  const [editingWebhookNode, setEditingWebhookNode] = useState<Node | null>(null);
+  const [workflowLogs, setWorkflowLogs] = useState<WorkflowLog[]>([]);
+  const [logPanelCollapsed, setLogPanelCollapsed] = useState(false); // Start expanded by default so it's visible
   const [nodeOutputs, setNodeOutputs] = useState<Record<
     string,
     {
@@ -60,10 +66,15 @@ export default function WorkflowEditorPage() {
   const getEdgesRef = useRef<(() => Edge[]) | null>(null);
   const utils = trpc.useUtils();
 
+  const addLog = useCallback((log: Omit<WorkflowLog, "timestamp">) => {
+    setWorkflowLogs((prev) => [...prev, { ...log, timestamp: new Date() }]);
+  }, []);
+
   const handleExecuteNode = useCallback((nodeId: string) => {
     if (!workflow) return;
 
     setExecutingNodeId(nodeId);
+    addLog({ level: "info", message: `Starting execution until node ${nodeId}` });
     
     runUntilNodeMutation.mutate(
       {
@@ -75,6 +86,12 @@ export default function WorkflowEditorPage() {
       {
         onSuccess: (result) => {
           console.log("Node execution result:", result);
+          const isSuccess = result.status === "completed";
+          addLog({ 
+            level: isSuccess ? "success" : "error", 
+            message: isSuccess ? "Execution completed successfully" : "Execution failed",
+          });
+          
           // Update node outputs with execution results
           if (result.nodeResults) {
             const formattedOutputs: Record<
@@ -87,6 +104,25 @@ export default function WorkflowEditorPage() {
               }
             > = {};
             Object.entries(result.nodeResults).forEach(([nodeId, nodeResult]) => {
+              const node = workflow.nodes.find(n => n.id === nodeId);
+              const nodeLabel = node?.label || `Node ${nodeId.substring(0, 8)}`;
+              
+              if (nodeResult.status === "completed") {
+                addLog({
+                  level: "success",
+                  nodeId,
+                  nodeLabel,
+                  message: `Completed in ${nodeResult.duration}ms`,
+                });
+              } else if (nodeResult.status === "failed") {
+                addLog({
+                  level: "error",
+                  nodeId,
+                  nodeLabel,
+                  message: nodeResult.error || "Unknown error",
+                });
+              }
+              
               formattedOutputs[nodeId] = {
                 status: nodeResult.status,
                 output: nodeResult.output,
@@ -102,6 +138,11 @@ export default function WorkflowEditorPage() {
         },
         onError: (error) => {
           console.error("Node execution error:", error);
+          addLog({
+            level: "error",
+            nodeId,
+            message: `Execution failed: ${error.message}`,
+          });
           
           // Set error status on the node instead of showing alert
           setNodeOutputs((prev) => ({
@@ -118,51 +159,142 @@ export default function WorkflowEditorPage() {
     );
   }, [workflow, runUntilNodeMutation, organizationId]);
 
-  const handleSaveTypeDefinitions = useCallback((types: string) => {
+  const handleWebhookTestFlow = useCallback((testData: Record<string, unknown>) => {
     if (!workflow) return;
+
+    addLog({ level: "info", message: `Testing webhook flow with received data` });
+    setExecutingNodeId(workflow.nodes[0]?.id || "");
+    
+    runMutation.mutate(
+      {
+        organizationId: organizationId,
+        workflowId: workflow.id,
+        triggerData: testData,
+      },
+      {
+        onSuccess: (result) => {
+          console.log("Test flow execution result:", result);
+          
+          // Check if execution was successful by checking status
+          const isSuccess = result.status === "completed";
+          
+          addLog({ 
+            level: isSuccess ? "success" : "error", 
+            message: isSuccess ? "Test flow completed successfully" : `Test flow failed: ${result.error}`,
+          });
+          
+          // Update node outputs with execution results
+          if (result.nodeResults) {
+            const formattedOutputs: Record<
+              string,
+              {
+                status: "pending" | "running" | "completed" | "failed";
+                output?: unknown;
+                error?: string;
+                duration?: number;
+              }
+            > = {};
+            Object.entries(result.nodeResults).forEach(([nodeId, nodeResult]) => {
+              const node = workflow.nodes.find(n => n.id === nodeId);
+              const nodeLabel = node?.label || `Node ${nodeId.substring(0, 8)}`;
+              
+              if (nodeResult.status === "completed") {
+                addLog({
+                  level: "success",
+                  nodeId,
+                  nodeLabel,
+                  message: `Completed in ${nodeResult.duration}ms`,
+                });
+              } else if (nodeResult.status === "failed") {
+                addLog({
+                  level: "error",
+                  nodeId,
+                  nodeLabel,
+                  message: nodeResult.error || "Unknown error",
+                });
+              }
+              
+              formattedOutputs[nodeId] = {
+                status: nodeResult.status,
+                output: nodeResult.output,
+                error: nodeResult.error,
+                duration: nodeResult.duration,
+              };
+            });
+            console.log("Formatted outputs:", formattedOutputs);
+            setNodeOutputs(formattedOutputs);
+          }
+          setExecutingNodeId(null);
+        },
+        onError: (error) => {
+          console.error("Test flow error:", error);
+          addLog({ level: "error", message: `Test flow failed: ${error.message}` });
+          setExecutingNodeId(null);
+        },
+      }
+    );
+  }, [workflow, runMutation, organizationId, addLog]);
+
+  const handleSaveTypeDefinitions = useCallback(async (types: string) => {
+    if (!workflow) return;
+
+    console.log('handleSaveTypeDefinitions called');
+    console.log('Received types parameter:', typeof types, 'length:', types?.length);
+    console.log('Received types content preview:', types ? types.substring(0, 200) : 'UNDEFINED OR NULL');
+    console.log('Saving type definitions:', types ? types.substring(0, 100) + '...' : 'EMPTY');
 
     const updatedMetadata = {
       ...workflow.metadata,
       typeDefinitions: types,
     };
 
-    saveMutation.mutate(
-      {
-        organizationId: organizationId,
-        workflowId: workflow.id,
-        workflow: {
-          name: workflow.name,
-          description: workflow.description || undefined,
-          version: workflow.version,
-          metadata: updatedMetadata,
+    console.log('Current workflow.metadata:', workflow.metadata);
+    console.log('Updated metadata:', updatedMetadata);
+    console.log('Updated metadata.typeDefinitions length:', updatedMetadata.typeDefinitions?.length);
+
+    return new Promise<void>((resolve, reject) => {
+      saveMutation.mutate(
+        {
+          organizationId: organizationId,
+          workflowId: workflow.id,
+          workflow: {
+            name: workflow.name,
+            description: workflow.description || undefined,
+            version: workflow.version,
+            metadata: updatedMetadata,
+          },
+          nodes: (workflow.nodes || []).map((node) => ({
+            id: node.id,
+            type: node.type || "workflow",
+            label: node.label || "Node",
+            position: node.position,
+            config: node.config || {},
+            executionOrder: node.executionOrder || 0,
+          })),
+          connections: (workflow.connections || []).map((edge) => ({
+            id: edge.id || undefined,
+            sourceNodeId: edge.sourceNodeId,
+            targetNodeId: edge.targetNodeId,
+            sourceHandle: edge.sourceHandle || undefined,
+            targetHandle: edge.targetHandle || undefined,
+          })),
         },
-        nodes: (workflow.nodes || []).map((node) => ({
-          id: node.id,
-          type: node.type || "workflow",
-          label: node.label || "Node",
-          position: node.position,
-          config: node.config || {},
-          executionOrder: node.executionOrder || 0,
-        })),
-        connections: (workflow.connections || []).map((edge) => ({
-          id: edge.id || undefined,
-          sourceNodeId: edge.sourceNodeId,
-          targetNodeId: edge.targetNodeId,
-          sourceHandle: edge.sourceHandle || undefined,
-          targetHandle: edge.targetHandle || undefined,
-        })),
-      },
-      {
-        onSuccess: async () => {
-          await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
-          await utils.workflows.getById.refetch({ organizationId, id: workflowId });
-        },
-        onError: (error) => {
-          console.error("Error saving type definitions:", error);
-          alert(`Error saving type definitions: ${error.message}`);
-        },
-      }
-    );
+        {
+          onSuccess: async () => {
+            console.log('Type definitions saved successfully, refreshing data...');
+            await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+            await utils.workflows.getById.refetch({ organizationId, id: workflowId });
+            console.log('Refreshed workflow data');
+            resolve();
+          },
+          onError: (error) => {
+            console.error("Error saving type definitions:", error);
+            alert(`Error saving type definitions: ${error.message}`);
+            reject(error);
+          },
+        }
+      );
+    });
   }, [workflow, saveMutation, organizationId, workflowId, utils]);
 
   const handleSave = useCallback(() => {
@@ -340,6 +472,7 @@ export default function WorkflowEditorPage() {
             size="sm"
             onClick={() => {
               if (workflow) {
+                addLog({ level: "info", message: "Starting full workflow execution" });
                 runMutation.mutate(
                   {
                     organizationId: organizationId,
@@ -350,6 +483,13 @@ export default function WorkflowEditorPage() {
                     onSuccess: (result) => {
                       console.log("Execution result received:", result);
                       console.log("Node results:", result.nodeResults);
+                      
+                      const isSuccess = result.status === "completed";
+                      addLog({ 
+                        level: isSuccess ? "success" : "error", 
+                        message: isSuccess ? "Workflow execution completed" : `Workflow failed: ${result.error}`,
+                      });
+                      
                       // Update node outputs with execution results
                       if (result.nodeResults) {
                         // Convert nodeResults to the expected format
@@ -363,6 +503,25 @@ export default function WorkflowEditorPage() {
                           }
                         > = {};
                         Object.entries(result.nodeResults).forEach(([nodeId, nodeResult]) => {
+                          const node = workflow.nodes.find(n => n.id === nodeId);
+                          const nodeLabel = node?.label || `Node ${nodeId.substring(0, 8)}`;
+                          
+                          if (nodeResult.status === "completed") {
+                            addLog({
+                              level: "success",
+                              nodeId,
+                              nodeLabel,
+                              message: `Completed in ${nodeResult.duration}ms`,
+                            });
+                          } else if (nodeResult.status === "failed") {
+                            addLog({
+                              level: "error",
+                              nodeId,
+                              nodeLabel,
+                              message: nodeResult.error || "Unknown error",
+                            });
+                          }
+                          
                           formattedOutputs[nodeId] = {
                             status: nodeResult.status,
                             output: nodeResult.output,
@@ -379,6 +538,7 @@ export default function WorkflowEditorPage() {
                     },
                     onError: (error) => {
                       console.error("Execution error:", error);
+                      addLog({ level: "error", message: `Execution failed: ${error.message}` });
                       alert(`Error: ${error.message}`);
                     },
                   }
@@ -404,7 +564,7 @@ export default function WorkflowEditorPage() {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Node Palette Sidebar */}
         <div 
-          className={`border-r bg-muted/50 transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 ${
+          className={`border-r bg-muted/50 transition-all duration-300 ease-in-out overflow-hidden shrink-0 ${
             leftSidebarOpen ? 'w-64' : 'w-0'
           }`}
         >
@@ -457,6 +617,36 @@ export default function WorkflowEditorPage() {
                 <div
                   draggable
                   onDragStart={(e) => {
+                    e.dataTransfer.setData("application/reactflow", "webhook");
+                  }}
+                  className="p-3 rounded-md border bg-background hover:bg-accent cursor-move transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Webhook className="h-4 w-4 text-purple-500" />
+                    <span className="text-sm font-medium">Webhook</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Receive HTTP requests
+                  </p>
+                </div>
+                <div
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("application/reactflow", "webhookResponse");
+                  }}
+                  className="p-3 rounded-md border bg-background hover:bg-accent cursor-move transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Send className="h-4 w-4 text-indigo-500" />
+                    <span className="text-sm font-medium">Webhook Response</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Send HTTP response
+                  </p>
+                </div>
+                <div
+                  draggable
+                  onDragStart={(e) => {
                     e.dataTransfer.setData("application/reactflow", "workflow");
                   }}
                   className="p-3 rounded-md border bg-background hover:bg-accent cursor-move transition-colors"
@@ -491,24 +681,45 @@ export default function WorkflowEditorPage() {
         )}
 
         <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-hidden relative">
-            <WorkflowEditor
-              workflow={workflow as any}
-              getNodesRef={getNodesRef}
-              getEdgesRef={getEdgesRef}
-              selectedNodeId={selectedNodeId}
-              onNodeSelect={setSelectedNodeId}
-              onExecuteNode={handleExecuteNode}
-              executingNodeId={executingNodeId}
-              typeDefinitions={(workflow?.metadata as { typeDefinitions?: string })?.typeDefinitions}
-              packageTypeDefinitions={installedPackages?.map(pkg => pkg.typeDefinitions).filter(Boolean).join('\n\n')}
-              nodeOutputs={nodeOutputs}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-hidden relative">
+              <WorkflowEditor
+                workflow={workflow as any}
+                getNodesRef={getNodesRef}
+                getEdgesRef={getEdgesRef}
+                selectedNodeId={selectedNodeId}
+                onNodeSelect={setSelectedNodeId}
+                onExecuteNode={handleExecuteNode}
+                executingNodeId={executingNodeId}
+                typeDefinitions={(() => {
+                  const typeDefs = (workflow?.metadata as { typeDefinitions?: string })?.typeDefinitions;
+                  console.log('WorkflowEditorPage - Type Definitions being passed:', typeDefs ? typeDefs.substring(0, 100) + '...' : 'empty/undefined');
+                  console.log('WorkflowEditorPage - Full metadata:', workflow?.metadata);
+                  return typeDefs;
+                })()}
+                packageTypeDefinitions={installedPackages?.map(pkg => pkg.typeDefinitions).filter(Boolean).join('\n\n')}
+                installedPackages={installedPackages?.map(pkg => ({ name: pkg.name, version: pkg.version }))}
+                nodeOutputs={nodeOutputs}
+                onWebhookEdit={(nodeId, node) => {
+                  setEditingWebhookNode(node);
+                  setWebhookDialogOpen(true);
+                }}
+              />
+            </div>
+            
+            {/* Workflow Log Panel at the bottom */}
+            <WorkflowLogPanel
+              logs={workflowLogs}
+              isExecuting={!!executingNodeId || runMutation.isPending}
+              onClear={() => setWorkflowLogs([])}
+              isCollapsed={logPanelCollapsed}
+              onToggleCollapse={() => setLogPanelCollapsed(!logPanelCollapsed)}
             />
           </div>
 
           {/* Right Sidebar - Node Output */}
           <div 
-            className={`border-l bg-background transition-all duration-300 ease-in-out overflow-hidden flex-shrink-0 ${
+            className={`border-l bg-background transition-all duration-300 ease-in-out overflow-hidden shrink-0 ${
               rightSidebarOpen ? 'w-96' : 'w-0'
             }`}
           >
@@ -553,6 +764,86 @@ export default function WorkflowEditorPage() {
         onOpenChange={setPackagesDialogOpen}
         organizationId={organizationId}
       />
+
+      {/* Webhook Dialog */}
+      {editingWebhookNode && (
+        <WebhookDialog
+          open={webhookDialogOpen}
+          onOpenChange={(open) => {
+            setWebhookDialogOpen(open);
+            if (!open) {
+              setEditingWebhookNode(null);
+            }
+          }}
+          nodeId={editingWebhookNode.id}
+          workflowId={workflowId}
+          organizationId={organizationId}
+          initialConfig={editingWebhookNode.data?.config as { path?: string; method?: string; webhookId?: string } | undefined}
+          initialLabel={editingWebhookNode.data?.label || "Webhook"}
+          onTestFlow={(testData) => {
+            handleWebhookTestFlow(testData);
+          }}
+          onSave={(data) => {
+            // Update the node in the editor via ref
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) => {
+              if (node.id === editingWebhookNode.id) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    label: data.label,
+                    config: data.config,
+                  },
+                };
+              }
+              return node;
+            });
+            
+            // We need to trigger a save with the updated nodes
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId: organizationId,
+                workflowId: workflow.id,
+                workflow: {
+                  name: workflow.name,
+                  description: workflow.description || undefined,
+                  version: workflow.version,
+                  metadata: workflow.metadata || undefined,
+                },
+                nodes: updatedNodes.map((node) => ({
+                  id: node.id,
+                  type: node.type || "workflow",
+                  label: node.data.label || "Node",
+                  position: node.position,
+                  config: node.data.config || {},
+                  executionOrder: 0,
+                })),
+                connections: currentEdges.map((edge) => ({
+                  id: edge.id || undefined,
+                  sourceNodeId: edge.source,
+                  targetNodeId: edge.target,
+                  sourceHandle: edge.sourceHandle || undefined,
+                  targetHandle: edge.targetHandle || undefined,
+                })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  await utils.workflows.getById.refetch({ organizationId, id: workflowId });
+                  setWebhookDialogOpen(false);
+                  setEditingWebhookNode(null);
+                },
+                onError: (error) => {
+                  console.error("Error saving webhook node:", error);
+                  alert(`Error saving webhook: ${error.message}`);
+                },
+              }
+            );
+          }}
+        />
+      )}
     </div>
   );
 }
