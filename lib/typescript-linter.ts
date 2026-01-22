@@ -10,15 +10,21 @@ export function createTypeScriptLinter(typeDefinitions?: string) {
     const diagnostics: Diagnostic[] = [];
 
     try {
+      // Extract import statements from user code
+      const importRegex = /^import\s+.+\s+from\s+['"].+['"];?\s*$/gm;
+      const imports = code.match(importRegex) || [];
+      const codeWithoutImports = code.replace(importRegex, '').trim();
+
       // Add global require declaration
       const requireDeclaration = `
 declare function require(moduleName: string): any;
 `;
       
-      // Combine type definitions with code for full type checking
+      // Combine imports, type definitions and code for full type checking
+      // Keep imports at top level to avoid "import must be at top level" errors
       const fullCode = typeDefinitions 
-        ? `${requireDeclaration}\n${typeDefinitions}\n\n${code}`
-        : `${requireDeclaration}\n\n${code}`;
+        ? `${requireDeclaration}\n${imports.join('\n')}\n${typeDefinitions}\n\n${codeWithoutImports}`
+        : `${requireDeclaration}\n${imports.join('\n')}\n\n${codeWithoutImports}`;
 
       // Create TypeScript program
       const sourceFile = ts.createSourceFile(
@@ -33,13 +39,13 @@ declare function require(moduleName: string): any;
 
       // Get semantic diagnostics (type errors)
       const compilerOptions: ts.CompilerOptions = {
-        target: ts.ScriptTarget.Latest,
-        module: ts.ModuleKind.CommonJS, // Support require()
+        target: ts.ScriptTarget.ES2022, // ES2022 supports top-level await
+        module: ts.ModuleKind.ES2022, // ES2022 module system
         strict: false, // Be less strict to avoid too many errors
         noImplicitAny: false,
         strictNullChecks: false,
         skipLibCheck: true,
-        lib: ["lib.es2020.d.ts"],
+        lib: ["lib.es2022.d.ts"], // Use ES2022 lib
         moduleResolution: ts.ModuleResolutionKind.NodeJs,
         noResolve: true, // Don't try to resolve imports
       };
@@ -70,26 +76,52 @@ declare function require(moduleName: string): any;
       const allDiagnostics = [...syntacticDiagnostics, ...semanticDiagnostics];
 
       // Convert TypeScript diagnostics to CodeMirror diagnostics
-      const typeDefLineCount = typeDefinitions ? typeDefinitions.split('\n').length + 2 : 0;
+      // Calculate offsets for imports and type definitions
+      const requireDeclLength = requireDeclaration.length;
+      const importsText = imports.join('\n');
+      const importsLength = importsText.length + (importsText ? 1 : 0); // +1 for newline
+      const typeDefLength = typeDefinitions ? typeDefinitions.length + 2 : 0; // +2 for "\n\n"
+      const totalOffset = requireDeclLength + importsLength + typeDefLength;
 
       allDiagnostics.forEach((diag) => {
         if (diag.file && diag.start !== undefined) {
           let start = diag.start;
           let end = diag.start + (diag.length || 1);
 
-          // If we have type definitions, adjust position to account for them
-          if (typeDefinitions) {
-            // Calculate the byte offset of where the code starts (after type definitions)
-            const typeDefOffset = typeDefinitions.length + 2; // +2 for "\n\n"
-            
-            // Check if the error is in the type definitions section
-            if (start < typeDefOffset) {
-              return; // Skip errors in type definitions section
+          // Check if the error is in the header section (require decl, imports, or type definitions)
+          if (start < totalOffset) {
+            // Check if error is in the imports section (we should map it back)
+            if (start >= requireDeclLength && start < requireDeclLength + importsLength && imports.length > 0) {
+              // Error is in imports - need to map back to original code position
+              const importsStartInOriginal = code.indexOf(imports[0]);
+              if (importsStartInOriginal >= 0) {
+                const offsetInImports = start - requireDeclLength;
+                start = importsStartInOriginal + offsetInImports;
+                end = start + (diag.length || 1);
+                
+                // Make sure positions are within bounds
+                if (start < 0 || start >= code.length) {
+                  return;
+                }
+                end = Math.min(Math.max(end, start + 1), code.length);
+              } else {
+                return; // Skip if we can't find the import in original code
+              }
+            } else {
+              return; // Skip errors in require declaration or type definitions
             }
-
-            // Subtract the type definition offset to get position in original code
-            start = start - typeDefOffset;
-            end = end - typeDefOffset;
+          } else {
+            // Subtract the total offset to get position in original code (without imports)
+            start = start - totalOffset;
+            end = end - totalOffset;
+            
+            // Now we need to add back the import lines in the original code
+            // Count how many import lines there are to adjust the position
+            const importLinesInOriginal = imports.length > 0 ? code.substring(0, code.indexOf(codeWithoutImports)).split('\n').length - 1 : 0;
+            const importCharsInOriginal = imports.length > 0 ? code.indexOf(codeWithoutImports) : 0;
+            
+            start = start + importCharsInOriginal;
+            end = end + importCharsInOriginal;
             
             // Make sure positions are within bounds
             if (start < 0 || start >= code.length) {
@@ -98,9 +130,6 @@ declare function require(moduleName: string): any;
             
             // Clamp end to code length
             end = Math.min(Math.max(end, start + 1), code.length);
-          } else {
-            // No type definitions - clamp end to code length
-            end = Math.min(end, code.length);
           }
 
           if (start >= end || start < 0) {
@@ -109,8 +138,8 @@ declare function require(moduleName: string): any;
 
           const message = ts.flattenDiagnosticMessageText(diag.messageText, "\n");
           
-          // Skip module-related errors - these are expected for installed packages
-          const moduleErrorPatterns = [
+          // Skip module-related errors and runtime wrapper errors - these are expected
+          const skipErrorPatterns = [
             "Cannot find module",
             "Cannot find name 'require'",
             "has no exported member",
@@ -119,9 +148,13 @@ declare function require(moduleName: string): any;
             "Duplicate identifier",
             "Module",
             "import",
+            "Top-level 'await'", // Code is wrapped in async function at runtime
+            "'await' expressions are only allowed", // Top-level await is allowed in wrapped code
+            "'return' statement can only be used", // Return is allowed - code is in a function at runtime
+            "A 'return' statement can only be used", // Same as above
           ];
           
-          if (moduleErrorPatterns.some(pattern => message.includes(pattern))) {
+          if (skipErrorPatterns.some(pattern => message.includes(pattern))) {
             return;
           }
           

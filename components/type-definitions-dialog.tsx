@@ -6,17 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
-import { oneDark } from "@codemirror/theme-one-dark";
+import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { linter } from "@codemirror/lint";
 import { autocompletion } from "@codemirror/autocomplete";
-import { FileType } from "lucide-react";
+import { FileType, Loader2 } from "lucide-react";
 import { createTypeDefinitionsLinter, typescriptKeywords, parseTypeDefinitions } from "@/lib/typescript-linter";
 
 interface TypeDefinitionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialTypes?: string;
-  onSave: (types: string) => void;
+  onSave: (types: string) => void | Promise<void>;
 }
 
 export function TypeDefinitionsDialog({
@@ -25,13 +25,47 @@ export function TypeDefinitionsDialog({
   initialTypes = "",
   onSave,
 }: TypeDefinitionsDialogProps) {
-  const [types, setTypes] = useState(initialTypes);
+  const defaultTemplate = `// Define your TypeScript types, interfaces, and type aliases here
+// These will be available in all code nodes
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  age?: number;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  inStock: boolean;
+}
+
+type Status = "pending" | "completed" | "failed";
+
+type ApiResponse<T> = {
+  data: T;
+  status: Status;
+  message?: string;
+};
+
+// Example usage in code nodes:
+// const user: User = $json as User;
+// const products: Product[] = $input.map(item => item.json as Product);
+`;
+
+  const [types, setTypes] = useState(initialTypes || defaultTemplate);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setTypes(initialTypes);
+      console.log('Type Definitions Dialog opened with initialTypes:', initialTypes ? initialTypes.substring(0, 100) + '...' : 'empty/undefined');
+      // Use initialTypes if provided, otherwise use default template
+      setTypes(initialTypes || defaultTemplate);
+      setIsSaving(false); // Reset saving state when dialog opens
     }
-  }, [open, initialTypes]);
+  }, [open, initialTypes, defaultTemplate]);
 
   // Parse existing types for autocomplete
   const existingTypes = useMemo(() => {
@@ -92,40 +126,30 @@ export function TypeDefinitionsDialog({
     return linter(createTypeDefinitionsLinter());
   }, []);
 
-  const handleSave = () => {
-    onSave(types);
-    onOpenChange(false);
+  const handleSave = async () => {
+    console.log('Dialog handleSave called');
+    console.log('Current types state length:', types.length);
+    console.log('Current types state preview:', types.substring(0, 200));
+    console.log('Saving type definitions from dialog:', types ? types.substring(0, 100) + '...' : 'EMPTY OR UNDEFINED');
+    
+    if (!types || types.trim() === '') {
+      console.error('Types are empty! Not saving.');
+      alert('Type definitions are empty. Please add some types before saving.');
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      await onSave(types);
+      console.log('Type definitions saved successfully, closing dialog');
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Failed to save type definitions:', error);
+      // Don't close dialog on error
+    } finally {
+      setIsSaving(false);
+    }
   };
-
-  const defaultTemplate = `// Define your TypeScript types, interfaces, and type aliases here
-// These will be available in all code nodes
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  age?: number;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  inStock: boolean;
-}
-
-type Status = "pending" | "completed" | "failed";
-
-type ApiResponse<T> = {
-  data: T;
-  status: Status;
-  message?: string;
-};
-
-// Example usage in code nodes:
-// const user: User = $json as User;
-// const products: Product[] = $input.map(item => item.json as Product);
-`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,8 +175,11 @@ type ApiResponse<T> = {
                 typeScriptLinter,
                 typeScriptAutocomplete,
               ]}
-              theme={oneDark}
-              onChange={(value) => setTypes(value)}
+              theme={vscodeDark}
+              onChange={(value) => {
+                console.log('CodeMirror onChange called, new value length:', value.length);
+                setTypes(value);
+              }}
               basicSetup={{
                 lineNumbers: true,
                 foldGutter: true,
@@ -184,17 +211,26 @@ type ApiResponse<T> = {
           <Button 
             variant="outline" 
             onClick={() => setTypes(defaultTemplate)}
+            disabled={isSaving}
           >
             Load Template
           </Button>
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)}
+            disabled={isSaving}
           >
             Cancel
           </Button>
-          <Button onClick={handleSave}>
-            Save Type Definitions
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Saving...
+              </>
+            ) : (
+              'Save Type Definitions'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
