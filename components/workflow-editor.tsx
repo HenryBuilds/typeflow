@@ -61,6 +61,7 @@ interface WorkflowEditorProps {
   onExecuteNode?: (nodeId: string) => void;
   executingNodeId?: string | null;
   typeDefinitions?: string;
+  packageTypeDefinitions?: string; // Combined type definitions from packages
   nodeOutputs?: Record<
     string,
     {
@@ -82,6 +83,7 @@ export function WorkflowEditor({
   onExecuteNode,
   executingNodeId,
   typeDefinitions,
+  packageTypeDefinitions,
   nodeOutputs,
 }: WorkflowEditorProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -391,8 +393,17 @@ export function WorkflowEditor({
       const baseLabel = type === "trigger" ? "Trigger" : type === "code" ? "Code Node" : "Node";
       const uniqueLabel = generateUniqueLabel(baseLabel, nodes);
 
+      // Generate a proper UUID for the node
+      const generateUUID = () => {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      };
+
       const newNode: Node = {
-        id: `${type}-${Date.now()}`,
+        id: generateUUID(),
         type,
         position,
         data: {
@@ -473,6 +484,7 @@ export function WorkflowEditor({
             inputData={nodeInputData}
             sourceNodeLabels={sourceNodeLabels}
             typeDefinitions={typeDefinitions}
+            packageTypeDefinitions={packageTypeDefinitions}
             existingNodeLabels={nodes
               .filter(n => n.id !== editingNodeId)
               .map(n => n.data?.label?.toString().trim())

@@ -11,7 +11,9 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { autocompletion, completionKeymap, acceptCompletion } from "@codemirror/autocomplete";
 import { keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
+import { linter } from "@codemirror/lint";
 import { GripVertical, ChevronRight, ChevronDown, ChevronLeft, PanelLeftClose, PanelLeftOpen, FileType } from "lucide-react";
+import { createTypeScriptLinter } from "@/lib/typescript-linter";
 
 interface CodeEditorDialogProps {
   open: boolean;
@@ -27,6 +29,7 @@ interface CodeEditorDialogProps {
   }>;
   sourceNodeLabels?: Record<string, string>; // Map of nodeId to label
   typeDefinitions?: string; // Global type definitions
+  packageTypeDefinitions?: string; // Type definitions from installed packages
   existingNodeLabels?: string[]; // List of existing node labels for uniqueness check
   onSave: (data: { code: string; label: string }) => void;
 }
@@ -40,6 +43,7 @@ export function CodeEditorDialog({
   inputData,
   sourceNodeLabels,
   typeDefinitions,
+  packageTypeDefinitions,
   existingNodeLabels = [],
   onSave,
 }: CodeEditorDialogProps) {
@@ -520,6 +524,19 @@ export function CodeEditorDialog({
     return [...definedTypes, ...standardTypes];
   }, [definedTypes, standardTypes]);
 
+  // Combine type definitions with package type definitions
+  const combinedTypeDefinitions = useMemo(() => {
+    const parts: string[] = [];
+    if (typeDefinitions) parts.push(typeDefinitions);
+    if (packageTypeDefinitions) parts.push(packageTypeDefinitions);
+    return parts.join('\n\n');
+  }, [typeDefinitions, packageTypeDefinitions]);
+
+  // Create TypeScript linter with combined type definitions
+  const typeScriptLinter = useMemo(() => {
+    return linter(createTypeScriptLinter(combinedTypeDefinitions));
+  }, [combinedTypeDefinitions]);
+
   // Custom autocomplete for variables and types
   const customAutocomplete = useMemo(() => {
     return autocompletion({
@@ -895,6 +912,7 @@ export function CodeEditorDialog({
                   height={`${editorHeight}px`}
                   extensions={[
                     javascript({ typescript: true }),
+                    typeScriptLinter,
                     customAutocomplete,
                     keymap.of([
                       ...completionKeymap,
@@ -921,6 +939,7 @@ export function CodeEditorDialog({
                     bracketMatching: true,
                     closeBrackets: true,
                     autocompletion: true,
+                    lintKeymap: true,
                   }}
                   onDrop={(e) => {
                     // Prevent CodeMirror's default drop behavior to avoid double insertion

@@ -2,6 +2,9 @@ import { db } from "@/db/db";
 import { workflows, nodes, connections, executions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import * as ts from "typescript";
+import { packageManager } from "./package-manager";
+import * as Module from "module";
+import * as path from "path";
 
 // Execution item structure
 interface ExecutionItem {
@@ -187,7 +190,7 @@ export class WorkflowExecutor {
             }
           }
           
-          outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, typeDefinitions);
+          outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, organizationId, typeDefinitions);
           console.log(`Code node ${currentNodeId} returned ${outputItems.length} items`);
         } else if (currentNode.type === "trigger") {
           outputItems = inputItems;
@@ -382,7 +385,7 @@ export class WorkflowExecutor {
             }
           }
           
-          outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, typeDefinitions);
+          outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, organizationId, typeDefinitions);
           console.log(
             `Code node ${currentNodeId} returned ${outputItems.length} items`
           );
@@ -450,6 +453,7 @@ export class WorkflowExecutor {
     node: typeof nodes.$inferSelect,
     inputItems: ExecutionItem[],
     predecessorOutputs: Map<string, { nodeLabel: string; output: ExecutionItem[] }>,
+    organizationId: string,
     typeDefinitions?: string
   ): Promise<ExecutionItem[]> {
     const code = (node.config as { code?: string })?.code;
@@ -464,8 +468,19 @@ export class WorkflowExecutor {
         ? `${typeDefinitions}\n\n${code}`
         : code;
 
+      // Add global declarations for runtime functions
+      const globalDeclarations = `
+declare function require(moduleName: string): any;
+declare const console: {
+  log(...args: any[]): void;
+  error(...args: any[]): void;
+  warn(...args: any[]): void;
+};
+`;
+
       // Wrap code in async function for type checking (same as runtime execution)
       const wrappedCodeForTypeCheck = `
+        ${globalDeclarations}
         ${typeDefinitions || ''}
         
         async function __userCode__() {
@@ -485,16 +500,17 @@ export class WorkflowExecutor {
       // Create compiler options
       const compilerOptions: ts.CompilerOptions = {
         target: ts.ScriptTarget.ES2020,
-        module: ts.ModuleKind.None,
+        module: ts.ModuleKind.CommonJS,
         lib: ['lib.es2020.d.ts'],
-        strict: true,
-        noImplicitAny: true,
-        strictNullChecks: true,
-        strictFunctionTypes: true,
+        strict: false, // Less strict to allow more flexibility
+        noImplicitAny: false, // Allow implicit any
+        strictNullChecks: false,
+        strictFunctionTypes: false,
         noUnusedLocals: false,
         noUnusedParameters: false,
         skipLibCheck: true,
         types: [],
+        noResolve: true, // Don't try to resolve imports
       };
 
       // Create a virtual compiler host that uses TypeScript's built-in lib files
@@ -575,9 +591,24 @@ export class WorkflowExecutor {
               },
             };
 
+            // Create custom require function with organization's node_modules path
+            const orgPackagesPath = packageManager.getNodeModulesPath(organizationId);
+            
+            // Create a require function that uses the organization's node_modules
+            const orgPackageJsonPath = path.join(path.dirname(orgPackagesPath), 'package.json');
+            let customRequire: (moduleName: string) => any;
+            
+            try {
+              // Create a require function with the organization's package.json as base
+              customRequire = Module.createRequire(orgPackageJsonPath);
+            } catch {
+              // Fallback to standard require if organization packages don't exist
+              customRequire = require;
+            }
+
             // Build parameter names and values for all predecessor nodes
-            const paramNames: string[] = ["$input", "console"];
-            const paramValues: unknown[] = [inputItems, safeConsole];
+            const paramNames: string[] = ["$input", "console", "require"];
+            const paramValues: unknown[] = [inputItems, safeConsole, customRequire];
             
             // Build convenience variables code
             let convenienceVarsCode = `

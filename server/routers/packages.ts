@@ -3,19 +3,46 @@ import { router, organizationProcedure } from "../trpc";
 import { db } from "@/db/db";
 import { packages } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { packageManager } from "../services/package-manager";
 
 export const packagesRouter = router({
   // List all packages in organization
-  list: organizationProcedure.query(async ({ ctx }) => {
-    return await db.query.packages.findMany({
-      where: eq(packages.organizationId, ctx.organization.id),
-      orderBy: (pkg, { desc }) => [desc(pkg.installedAt)],
-    });
-  }),
+  list: organizationProcedure
+    .input(z.object({ organizationId: z.string() }).optional())
+    .query(async ({ ctx }) => {
+      return await db.query.packages.findMany({
+        where: eq(packages.organizationId, ctx.organization.id),
+        orderBy: (pkg, { desc }) => [desc(pkg.installedAt)],
+      });
+    }),
+
+  // Search packages on npm
+  search: organizationProcedure
+    .input(z.object({ 
+      organizationId: z.string(),
+      query: z.string().min(1),
+      limit: z.number().optional().default(20),
+    }))
+    .query(async ({ input }) => {
+      return await packageManager.searchPackages(input.query, input.limit);
+    }),
+
+  // Get package info from npm
+  getInfo: organizationProcedure
+    .input(z.object({ 
+      organizationId: z.string(),
+      name: z.string() 
+    }))
+    .query(async ({ input }) => {
+      return await packageManager.getPackageInfo(input.name);
+    }),
 
   // Get package by name
   getByName: organizationProcedure
-    .input(z.object({ name: z.string() }))
+    .input(z.object({ 
+      organizationId: z.string(),
+      name: z.string() 
+    }))
     .query(async ({ ctx, input }) => {
       const pkg = await db.query.packages.findFirst({
         where: and(
@@ -31,88 +58,62 @@ export const packagesRouter = router({
       return pkg;
     }),
 
-  // Install package
+  // Install package (actual npm install)
   install: organizationProcedure
     .input(
       z.object({
+        organizationId: z.string(),
         name: z.string().min(1),
-        version: z.string().min(1),
-        packageJson: z.record(z.string(), z.unknown()),
-        typeDefinitions: z.string().optional(),
-        dependencies: z.record(z.string(), z.string()).optional(),
-        devDependencies: z.record(z.string(), z.string()).optional(),
+        version: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Check if package already exists
-      const existing = await db.query.packages.findFirst({
+      const result = await packageManager.installPackage(
+        ctx.organization.id,
+        input.name,
+        input.version
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to install package");
+      }
+
+      // Return the installed package from DB
+      const installed = await db.query.packages.findFirst({
         where: and(
           eq(packages.organizationId, ctx.organization.id),
           eq(packages.name, input.name)
         ),
       });
 
-      if (existing) {
-        // Update existing package
-        const [updated] = await db
-          .update(packages)
-          .set({
-            version: input.version,
-            packageJson: input.packageJson,
-            typeDefinitions: input.typeDefinitions,
-            dependencies: input.dependencies as Record<string, string> | undefined,
-            devDependencies: input.devDependencies as Record<string, string> | undefined,
-            installedAt: new Date(),
-            isActive: true,
-          })
-          .where(eq(packages.id, existing.id))
-          .returning();
-
-        return updated;
-      }
-
-      // Create new package
-      const [created] = await db
-        .insert(packages)
-        .values({
-          organizationId: ctx.organization.id,
-          name: input.name,
-          version: input.version,
-          packageJson: input.packageJson,
-          typeDefinitions: input.typeDefinitions,
-          dependencies: input.dependencies as Record<string, string> | undefined,
-          devDependencies: input.devDependencies as Record<string, string> | undefined,
-        })
-        .returning();
-
-      return created;
+      return installed;
     }),
 
-  // Uninstall package (set inactive)
+  // Uninstall package (actual npm uninstall)
   uninstall: organizationProcedure
-    .input(z.object({ name: z.string() }))
+    .input(z.object({ 
+      organizationId: z.string(),
+      name: z.string() 
+    }))
     .mutation(async ({ ctx, input }) => {
-      const [updated] = await db
-        .update(packages)
-        .set({ isActive: false })
-        .where(
-          and(
-            eq(packages.organizationId, ctx.organization.id),
-            eq(packages.name, input.name)
-          )
-        )
-        .returning();
+      const result = await packageManager.uninstallPackage(
+        ctx.organization.id,
+        input.name
+      );
 
-      if (!updated) {
-        throw new Error("Package not found");
+      if (!result.success) {
+        throw new Error(result.error || "Failed to uninstall package");
       }
 
-      return updated;
+      return { success: true };
     }),
 
   // Delete package completely
   delete: organizationProcedure
-    .input(z.object({ name: z.string() }))
+    .input(z.object({ 
+      organizationId: z.string(),
+      name: z.string() 
+    }))
     .mutation(async ({ ctx, input }) => {
       await db
         .delete(packages)

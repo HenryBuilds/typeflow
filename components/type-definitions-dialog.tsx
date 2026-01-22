@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
+import { linter } from "@codemirror/lint";
+import { autocompletion } from "@codemirror/autocomplete";
 import { FileType } from "lucide-react";
+import { createTypeDefinitionsLinter, typescriptKeywords, parseTypeDefinitions } from "@/lib/typescript-linter";
 
 interface TypeDefinitionsDialogProps {
   open: boolean;
@@ -29,6 +32,65 @@ export function TypeDefinitionsDialog({
       setTypes(initialTypes);
     }
   }, [open, initialTypes]);
+
+  // Parse existing types for autocomplete
+  const existingTypes = useMemo(() => {
+    return parseTypeDefinitions(types);
+  }, [types]);
+
+  // Create TypeScript autocomplete
+  const typeScriptAutocomplete = useMemo(() => {
+    return autocompletion({
+      activateOnTyping: true,
+      override: [
+        // Autocomplete for TypeScript keywords and types
+        (context) => {
+          const word = context.matchBefore(/\w*/);
+          if (!word) return null;
+          
+          if (word.from === word.to && !context.explicit) return null;
+          
+          // Combine keywords with existing types
+          const allCompletions = [
+            ...typescriptKeywords,
+            ...existingTypes.map(t => ({
+              label: t.label,
+              type: t.type,
+              info: t.info,
+              boost: 99, // Custom types get higher priority
+            })),
+          ];
+          
+          return {
+            from: word.from,
+            options: allCompletions,
+          };
+        },
+        // Autocomplete after 'interface' or 'type' keywords
+        (context) => {
+          const line = context.state.doc.lineAt(context.pos);
+          const textBefore = line.text.slice(0, context.pos - line.from);
+          
+          if (/\binterface\s+$/.test(textBefore) || /\btype\s+$/.test(textBefore)) {
+            return {
+              from: context.pos,
+              options: [
+                { label: 'MyType', type: 'snippet', info: 'Type name (customize)' },
+                { label: 'MyInterface', type: 'snippet', info: 'Interface name (customize)' },
+              ],
+            };
+          }
+          
+          return null;
+        },
+      ],
+    });
+  }, [existingTypes]);
+
+  // Create TypeScript linter
+  const typeScriptLinter = useMemo(() => {
+    return linter(createTypeDefinitionsLinter());
+  }, []);
 
   const handleSave = () => {
     onSave(types);
@@ -84,7 +146,11 @@ type ApiResponse<T> = {
             <CodeMirror
               value={types || defaultTemplate}
               height="100%"
-              extensions={[javascript({ typescript: true })]}
+              extensions={[
+                javascript({ typescript: true }),
+                typeScriptLinter,
+                typeScriptAutocomplete,
+              ]}
               theme={oneDark}
               onChange={(value) => setTypes(value)}
               basicSetup={{
@@ -96,15 +162,20 @@ type ApiResponse<T> = {
                 bracketMatching: true,
                 closeBrackets: true,
                 autocompletion: true,
+                lintKeymap: true,
               }}
             />
           </div>
-          <div className="mt-3 p-3 bg-muted/50 rounded-md border">
+          <div className="mt-3 p-3 bg-muted/50 rounded-md border space-y-2">
             <p className="text-xs text-muted-foreground">
-              <strong>Tip:</strong> These type definitions will be prepended to all code nodes during execution.
+              <strong>💡 Tip:</strong> These type definitions will be prepended to all code nodes during execution.
               Use type assertions (e.g., <code className="px-1 py-0.5 bg-background rounded">as User</code>) or 
               explicit types (e.g., <code className="px-1 py-0.5 bg-background rounded">const user: User = ...</code>) 
               in your code nodes.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              <strong>⌨️ Autocomplete:</strong> Press <kbd className="px-1 py-0.5 bg-background rounded text-[10px]">Ctrl+Space</kbd> for suggestions.
+              Errors are highlighted in red.
             </p>
           </div>
         </div>

@@ -5,10 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { TypeDefinitionsDialog } from "@/components/type-definitions-dialog";
+import { PackagesDialog } from "@/components/packages-dialog";
 import { useSaveWorkflow } from "@/hooks/use-workflows";
 import { Node, Edge } from "reactflow";
 
@@ -30,12 +31,19 @@ export default function WorkflowEditorPage() {
     }
   );
 
+  // Get installed packages for type definitions
+  const { data: installedPackages } = trpc.packages.list.useQuery(
+    { organizationId },
+    { enabled: !!organizationId }
+  );
+
   const [editorData, setEditorData] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [executingNodeId, setExecutingNodeId] = useState<string | null>(null);
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [typeDefinitionsOpen, setTypeDefinitionsOpen] = useState(false);
+  const [packagesDialogOpen, setPackagesDialogOpen] = useState(false);
   const [nodeOutputs, setNodeOutputs] = useState<Record<
     string,
     {
@@ -321,6 +329,15 @@ export default function WorkflowEditorPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setPackagesDialogOpen(true)}
+            title="Manage npm packages"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Packages
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => {
               if (workflow) {
                 runMutation.mutate(
@@ -476,7 +493,7 @@ export default function WorkflowEditorPage() {
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 overflow-hidden relative">
             <WorkflowEditor
-              workflow={workflow}
+              workflow={workflow as any}
               getNodesRef={getNodesRef}
               getEdgesRef={getEdgesRef}
               selectedNodeId={selectedNodeId}
@@ -484,6 +501,7 @@ export default function WorkflowEditorPage() {
               onExecuteNode={handleExecuteNode}
               executingNodeId={executingNodeId}
               typeDefinitions={(workflow?.metadata as { typeDefinitions?: string })?.typeDefinitions}
+              packageTypeDefinitions={installedPackages?.map(pkg => pkg.typeDefinitions).filter(Boolean).join('\n\n')}
               nodeOutputs={nodeOutputs}
             />
           </div>
@@ -527,6 +545,13 @@ export default function WorkflowEditorPage() {
         onOpenChange={setTypeDefinitionsOpen}
         initialTypes={(workflow?.metadata as { typeDefinitions?: string })?.typeDefinitions || ""}
         onSave={handleSaveTypeDefinitions}
+      />
+
+      {/* Packages Dialog */}
+      <PackagesDialog
+        open={packagesDialogOpen}
+        onOpenChange={setPackagesDialogOpen}
+        organizationId={organizationId}
       />
     </div>
   );
