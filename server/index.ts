@@ -5,6 +5,7 @@ import { packagesRouter } from "./routers/packages";
 import { executionsRouter } from "./routers/executions";
 import { environmentsRouter } from "./routers/environments";
 import { webhooksRouter } from "./routers/webhooks";
+import { credentialsRouter } from "./routers/credentials";
 import { authRouter } from "./routers/auth";
 
 export const appRouter = router({
@@ -15,6 +16,7 @@ export const appRouter = router({
   executions: executionsRouter,
   environments: environmentsRouter,
   webhooks: webhooksRouter,
+  credentials: credentialsRouter,
 });
 
 // Export type router type signature,

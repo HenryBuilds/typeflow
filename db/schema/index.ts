@@ -13,6 +13,7 @@ export * from "./logs";
 export * from "./webhooks";
 export * from "./webhook-requests";
 export * from "./environments";
+export * from "./credentials";
 
 // Import tables for relations
 import { organizations } from "./organizations";
@@ -27,6 +28,7 @@ import { webhooks } from "./webhooks";
 import { webhookRequests } from "./webhook-requests";
 import { packages } from "./packages";
 import { environments } from "./environments";
+import { credentials } from "./credentials";
 
 // Define all relations here to avoid circular dependencies
 export const organizationsRelations = relations(organizations, ({ many }) => ({
@@ -37,6 +39,7 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   webhooks: many(webhooks),
   executions: many(executions),
   logs: many(logs),
+  credentials: many(credentials),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -153,6 +156,13 @@ export const webhookRequestsRelations = relations(webhookRequests, ({ one }) => 
   }),
 }));
 
+export const credentialsRelations = relations(credentials, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [credentials.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
 // Export inferred types
 export type Organization = InferSelectModel<typeof organizations>;
 export type NewOrganization = InferInsertModel<typeof organizations>;
@@ -190,3 +200,5 @@ export type NewWebhookRequest = InferInsertModel<typeof webhookRequests>;
 export type Environment = InferSelectModel<typeof environments>;
 export type NewEnvironment = InferInsertModel<typeof environments>;
 
+export type Credential = InferSelectModel<typeof credentials>;
+export type NewCredential = InferInsertModel<typeof credentials>;
