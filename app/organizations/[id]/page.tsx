@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowLeft, Building2, Users, Settings, Loader2, Workflow, Plus } from "lucide-react";
+import { ArrowLeft, Building2, Users, Settings, Loader2, Workflow, Plus, Key } from "lucide-react";
 
 export default function OrganizationDetailPage() {
   const router = useRouter();
@@ -41,6 +41,14 @@ export default function OrganizationDetailPage() {
 
   const { data: workflows, isLoading: isLoadingWorkflows } =
     trpc.workflows.list.useQuery(
+      { organizationId: id },
+      {
+        enabled: !!id && !!organization,
+      }
+    );
+
+  const { data: credentials, isLoading: isLoadingCredentials } =
+    trpc.credentials.list.useQuery(
       { organizationId: id },
       {
         enabled: !!id && !!organization,
@@ -255,6 +263,44 @@ export default function OrganizationDetailPage() {
                 <pre className="text-xs mt-1 p-2 rounded bg-muted overflow-auto">
                   {JSON.stringify(organization.settings, null, 2)}
                 </pre>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              Credentials
+            </CardTitle>
+            <CardDescription>
+              {isLoadingCredentials ? (
+                "Loading..."
+              ) : (
+                <>
+                  {credentials?.length || 0} credential
+                  {(credentials?.length || 0) !== 1 ? "s" : ""}
+                </>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingCredentials ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Manage database connections and API credentials
+                </p>
+                <Link href={`/organizations/${id}/credentials`}>
+                  <Button variant="outline" size="sm">
+                    <Key className="h-4 w-4 mr-2" />
+                    Manage Credentials
+                  </Button>
+                </Link>
               </div>
             )}
           </CardContent>
