@@ -3,6 +3,7 @@ import { workflows, nodes, connections, executions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import * as ts from "typescript";
 import { packageManager } from "./package-manager";
+import { credentialService } from "./credential-service";
 import * as Module from "module";
 import * as path from "path";
 
@@ -99,6 +100,38 @@ export class WorkflowExecutor {
       throw new Error("No trigger or webhook node found");
     }
 
+    // Pre-execute all utilities nodes to make their functions available
+    const utilities = new Map<string, { label: string; exports: Record<string, any>; code: string }>();
+    const utilityNodes = workflow.nodes.filter(n => n.type === "utilities");
+    
+    for (const utilityNode of utilityNodes) {
+      try {
+        const utilityCode = (utilityNode.config as { code?: string })?.code || '';
+        const exports = await this.executeUtilitiesNode(utilityNode, organizationId, typeDefinitions);
+        utilities.set(utilityNode.id, { 
+          label: utilityNode.label || "Utilities", 
+          exports,
+          code: utilityCode
+        });
+        
+        // Mark as executed successfully
+        nodeResults[utilityNode.id] = {
+          nodeId: utilityNode.id,
+          status: "completed",
+          output: [{ json: { exports: Object.keys(exports) } }],
+          duration: 0,
+        };
+      } catch (error: any) {
+        nodeResults[utilityNode.id] = {
+          nodeId: utilityNode.id,
+          status: "failed",
+          error: error.message,
+          duration: 0,
+        };
+        throw new Error(`Utilities node ${utilityNode.label || utilityNode.id} failed: ${error.message}`);
+      }
+    }
+
     // Ensure trigger/webhook is in predecessors
     predecessors.add(triggerNode.id);
 
@@ -190,10 +223,13 @@ export class WorkflowExecutor {
             }
           }
           
-          outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, organizationId, typeDefinitions);
+          outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, organizationId, typeDefinitions, utilities);
           console.log(`${currentNode.type === "webhookResponse" ? "Webhook Response" : "Code"} node ${currentNodeId} returned ${outputItems.length} items`);
         } else if (currentNode.type === "trigger" || currentNode.type === "webhook") {
           outputItems = inputItems;
+        } else if (currentNode.type === "utilities") {
+          // Utilities nodes are pre-executed, skip them in the main loop
+          continue;
         } else {
           outputItems = inputItems;
         }
@@ -293,6 +329,38 @@ export class WorkflowExecutor {
       throw new Error("No trigger or webhook node found");
     }
 
+    // Pre-execute all utilities nodes to make their functions available
+    const utilities = new Map<string, { label: string; exports: Record<string, any>; code: string }>();
+    const utilityNodes = workflow.nodes.filter(n => n.type === "utilities");
+    
+    for (const utilityNode of utilityNodes) {
+      try {
+        const utilityCode = (utilityNode.config as { code?: string })?.code || '';
+        const exports = await this.executeUtilitiesNode(utilityNode, organizationId, typeDefinitions);
+        utilities.set(utilityNode.id, { 
+          label: utilityNode.label || "Utilities", 
+          exports,
+          code: utilityCode
+        });
+        
+        // Mark as executed successfully
+        nodeResults[utilityNode.id] = {
+          nodeId: utilityNode.id,
+          status: "completed",
+          output: [{ json: { exports: Object.keys(exports) } }],
+          duration: 0,
+        };
+      } catch (error: any) {
+        nodeResults[utilityNode.id] = {
+          nodeId: utilityNode.id,
+          status: "failed",
+          error: error.message,
+          duration: 0,
+        };
+        throw new Error(`Utilities node ${utilityNode.label || utilityNode.id} failed: ${error.message}`);
+      }
+    }
+
     // Execute nodes in order
     const executedNodes = new Set<string>();
     const executionQueue: string[] = [triggerNode.id];
@@ -385,12 +453,15 @@ export class WorkflowExecutor {
             }
           }
           
-          outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, organizationId, typeDefinitions);
+          outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, organizationId, typeDefinitions, utilities);
           console.log(
             `${currentNode.type === "webhookResponse" ? "Webhook Response" : "Code"} node ${currentNodeId} returned ${outputItems.length} items`
           );
         } else if (currentNode.type === "trigger" || currentNode.type === "webhook") {
           outputItems = inputItems; // Trigger just passes through
+        } else if (currentNode.type === "utilities") {
+          // Utilities nodes are pre-executed, skip them in the main loop
+          continue;
         } else {
           // Generic node - just pass through
           outputItems = inputItems;
@@ -449,12 +520,133 @@ export class WorkflowExecutor {
     };
   }
 
+  private extractFunctionNames(code: string): string[] {
+    const functions: string[] = [];
+    
+    // Match function declarations: function name(...) { ... }
+    const functionMatches = code.matchAll(/function\s+([a-zA-Z_$][\w$]*)\s*\(/g);
+    for (const match of functionMatches) {
+      functions.push(match[1]);
+    }
+    
+    // Match arrow functions: const name = (...) => ...
+    const arrowMatches = code.matchAll(/const\s+([a-zA-Z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g);
+    for (const match of arrowMatches) {
+      functions.push(match[1]);
+    }
+    
+    // Match named exports in module.exports
+    const exportMatch = code.match(/module\.exports\s*=\s*\{([^}]+)\}/);
+    if (exportMatch) {
+      const exportedNames = exportMatch[1]
+        .split(',')
+        .map(name => name.trim().split(':')[0].trim())
+        .filter(Boolean);
+      // Use exported names if available, otherwise use all found functions
+      return exportedNames.length > 0 ? exportedNames : functions;
+    }
+    
+    return functions;
+  }
+
+  private async executeUtilitiesNode(
+    node: typeof nodes.$inferSelect,
+    organizationId: string,
+    typeDefinitions?: string
+  ): Promise<Record<string, any>> {
+    const code = (node.config as { code?: string })?.code;
+
+    if (!code || code.trim() === "") {
+      return {}; // No functions if no code
+    }
+
+    try {
+      // Extract import statements
+      const importRegex = /^import\s+.+\s+from\s+['"].+['"];?\s*$/gm;
+      const imports = code.match(importRegex) || [];
+      const codeWithoutImports = code.replace(importRegex, '').trim();
+
+      // Convert imports to require statements
+      const requireStatements = imports.map(importStmt => {
+        const defaultMatch = importStmt.match(/import\s+(\w+)\s+from\s+['"](.+)['"]/);
+        if (defaultMatch && !importStmt.includes('{')) {
+          return `const ${defaultMatch[1]} = require('${defaultMatch[2]}');`;
+        }
+        
+        const namedMatch = importStmt.match(/import\s+\{([^}]+)\}\s+from\s+['"](.+)['"]/);
+        if (namedMatch) {
+          const names = namedMatch[1].trim();
+          const module = namedMatch[2];
+          return `const { ${names} } = require('${module}');`;
+        }
+        
+        const namespaceMatch = importStmt.match(/import\s+\*\s+as\s+(\w+)\s+from\s+['"](.+)['"]/);
+        if (namespaceMatch) {
+          return `const ${namespaceMatch[1]} = require('${namespaceMatch[2]}');`;
+        }
+        
+        return importStmt;
+      }).join('\n');
+
+      // Transpile TypeScript to JavaScript
+      const transpileResult = ts.transpileModule(codeWithoutImports, {
+        compilerOptions: {
+          target: ts.ScriptTarget.ES2020,
+          module: ts.ModuleKind.CommonJS,
+        },
+      });
+      const jsCode = transpileResult.outputText.trim();
+
+      // Execute the transpiled code with proper CommonJS module support
+      const wrappedCode = `
+        return (async function(require, module, exports) {
+          ${requireStatements}
+          
+          // Execute the transpiled code
+          ${jsCode}
+          
+          // Return module.exports (which might have been reassigned)
+          return module.exports;
+        })(require, module, exports);
+      `;
+
+      // Execute the code
+      const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+      const executableFunction = new AsyncFunction('require', 'module', 'exports', wrappedCode);
+      
+      // Create custom require function
+      // Try to use organization-specific node_modules if available
+      let customRequire: NodeRequire = require;
+      try {
+        const orgPackagesPath = packageManager.getNodeModulesPath(organizationId);
+        const orgPackageJsonPath = path.join(orgPackagesPath, "..", "package.json");
+        customRequire = Module.createRequire(orgPackageJsonPath);
+      } catch {
+        // Fallback to standard require
+        customRequire = require;
+      }
+      
+      // Create module and exports objects (CommonJS pattern)
+      const exportsObj: any = {};
+      const moduleObj = { exports: exportsObj };
+
+      // Execute and get exports
+      const result = await executableFunction(customRequire, moduleObj, exportsObj);
+      
+      // Return the result (module.exports after execution)
+      return result && typeof result === 'object' ? result : {};
+    } catch (error: any) {
+      throw new Error(`Utilities execution failed: ${error.message}`);
+    }
+  }
+
   private async executeCodeNode(
     node: typeof nodes.$inferSelect,
     inputItems: ExecutionItem[],
     predecessorOutputs: Map<string, { nodeLabel: string; output: ExecutionItem[] }>,
     organizationId: string,
-    typeDefinitions?: string
+    typeDefinitions?: string,
+    utilities?: Map<string, { label: string; exports: Record<string, any>; code: string }>
   ): Promise<ExecutionItem[]> {
     const code = (node.config as { code?: string })?.code;
 
@@ -506,6 +698,30 @@ export class WorkflowExecutor {
         predecessorDeclarations += `declare const ${varName}: { json: any; input: any[] };\n`;
       });
 
+      // Generate utilities declarations
+      let utilitiesDeclarations = '';
+      if (utilities) {
+        utilities.forEach((utilityData, utilityNodeId) => {
+          const sanitizedLabel = utilityData.label.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^[0-9]/, '_$&');
+          const varName = `$${sanitizedLabel}`;
+          
+          // Try to get function names from exports first
+          let functionNames = Object.keys(utilityData.exports);
+          
+          // If exports is empty (during type-checking), extract from code
+          if (functionNames.length === 0 && utilityData.code) {
+            functionNames = this.extractFunctionNames(utilityData.code);
+          }
+          
+          // Generate type declarations for each function
+          const exportDeclarations = functionNames
+            .map(fnName => `  ${fnName}: (...args: any[]) => any;`)
+            .join('\n');
+          
+          utilitiesDeclarations += `declare const ${varName}: {\n${exportDeclarations}\n};\n`;
+        });
+      }
+
       const globalDeclarations = `
 declare function require(moduleName: string): any;
 declare const console: {
@@ -517,7 +733,9 @@ declare const $input: any[];
 declare const $json: any;
 declare const $inputItem: any;
 declare const $inputAll: any[];
+declare const $credentials: Record<string, any>;
 ${predecessorDeclarations}
+${utilitiesDeclarations}
 `;
 
       // Wrap code in async function for type checking
@@ -636,6 +854,9 @@ ${predecessorDeclarations}
       });
       const jsCodeWithoutRequires = transpileResult.outputText.trim();
 
+      // Load credentials for this organization
+      const credentials = await credentialService.getCredentials(organizationId);
+
       // Create a safe execution context with timeout
       const executeWithTimeout = async (
         code: string,
@@ -676,8 +897,8 @@ ${predecessorDeclarations}
             }
 
             // Build parameter names and values for all predecessor nodes
-            const paramNames: string[] = ["$input", "console", "require"];
-            const paramValues: unknown[] = [inputItems, safeConsole, customRequire];
+            const paramNames: string[] = ["$input", "console", "require", "$credentials"];
+            const paramValues: unknown[] = [inputItems, safeConsole, customRequire, credentials];
             
             // Build convenience variables code
             let convenienceVarsCode = `
@@ -701,6 +922,17 @@ ${predecessorDeclarations}
               paramNames.push(varName);
               paramValues.push(nodeData);
             });
+            
+            // Add utilities as parameters
+            if (utilities) {
+              utilities.forEach((utilityData, utilityNodeId) => {
+                const sanitizedLabel = utilityData.label.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^[0-9]/, '_$&');
+                const varName = `$${sanitizedLabel}`;
+                
+                paramNames.push(varName);
+                paramValues.push(utilityData.exports);
+              });
+            }
             
             // Code receives $input (items array) and should return items array
             // Provide convenience variables for accessing previous node's output
