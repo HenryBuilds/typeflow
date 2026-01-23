@@ -38,22 +38,6 @@ type Awaited<T> = T extends PromiseLike<infer U> ? U : T;
 type PropertyKey = string | number | symbol;
 
 // ========================================
-// Primitive Values
-// ========================================
-
-type string = string;
-type number = number;
-type boolean = boolean;
-type symbol = symbol;
-type bigint = bigint;
-type undefined = undefined;
-type null = null;
-type any = any;
-type unknown = unknown;
-type never = never;
-type void = void;
-
-// ========================================
 // Built-in JavaScript types
 // ========================================
 interface Date {
@@ -66,32 +50,52 @@ interface Date {
   valueOf(): number;
   getTime(): number;
   getFullYear(): number;
+  getUTCFullYear(): number;
   getMonth(): number;
+  getUTCMonth(): number;
   getDate(): number;
+  getUTCDate(): number;
   getDay(): number;
+  getUTCDay(): number;
   getHours(): number;
+  getUTCHours(): number;
   getMinutes(): number;
+  getUTCMinutes(): number;
   getSeconds(): number;
+  getUTCSeconds(): number;
   getMilliseconds(): number;
+  getUTCMilliseconds(): number;
+  getTimezoneOffset(): number;
   setTime(time: number): number;
   setFullYear(year: number, month?: number, date?: number): number;
+  setUTCFullYear(year: number, month?: number, date?: number): number;
   setMonth(month: number, date?: number): number;
+  setUTCMonth(month: number, date?: number): number;
   setDate(date: number): number;
+  setUTCDate(date: number): number;
   setHours(hours: number, min?: number, sec?: number, ms?: number): number;
+  setUTCHours(hours: number, min?: number, sec?: number, ms?: number): number;
   setMinutes(min: number, sec?: number, ms?: number): number;
+  setUTCMinutes(min: number, sec?: number, ms?: number): number;
   setSeconds(sec: number, ms?: number): number;
+  setUTCSeconds(sec: number, ms?: number): number;
   setMilliseconds(ms: number): number;
+  setUTCMilliseconds(ms: number): number;
   toISOString(): string;
   toJSON(key?: any): string;
+  toUTCString(): string;
+  toGMTString(): string;
 }
 
 interface DateConstructor {
   new(): Date;
-  new(value: number | string): Date;
+  new(value: number | string | Date): Date;
   new(year: number, month: number, date?: number, hours?: number, minutes?: number, seconds?: number, ms?: number): Date;
   (): string;
+  (value: number | string | Date): string;
   readonly prototype: Date;
   parse(s: string): number;
+  UTC(year: number, month: number, date?: number, hours?: number, minutes?: number, seconds?: number, ms?: number): number;
   now(): number;
 }
 
@@ -132,6 +136,7 @@ interface String {
   substr(from: number, length?: number): string;
   valueOf(): string;
   [index: number]: string;
+  [Symbol.iterator](): IterableIterator<string>;
 }
 
 interface Number {
@@ -233,6 +238,10 @@ interface Set<T> {
   forEach(callbackfn: (value: T, value2: T, set: Set<T>) => void): void;
   has(value: T): boolean;
   readonly size: number;
+  entries(): IterableIterator<[T, T]>;
+  keys(): IterableIterator<T>;
+  values(): IterableIterator<T>;
+  [Symbol.iterator](): IterableIterator<T>;
 }
 
 interface SetConstructor {
@@ -408,6 +417,7 @@ interface Map<K, V> {
   entries(): IterableIterator<[K, V]>;
   keys(): IterableIterator<K>;
   values(): IterableIterator<V>;
+  [Symbol.iterator](): IterableIterator<[K, V]>;
 }
 
 interface MapConstructor {
