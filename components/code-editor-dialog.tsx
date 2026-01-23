@@ -13,7 +13,8 @@ import { keymap, EditorView } from "@codemirror/view";
 import { indentWithTab, indentMore } from "@codemirror/commands";
 import { Prec } from "@codemirror/state";
 import { linter } from "@codemirror/lint";
-import { GripVertical, ChevronRight, ChevronDown, ChevronLeft, PanelLeftClose, PanelLeftOpen, FileType } from "lucide-react";
+import { GripVertical, ChevronRight, ChevronDown, ChevronLeft, PanelLeftClose, PanelLeftOpen, FileType, Code2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { createTypeScriptLinter } from "@/lib/typescript-linter";
 import { trpc } from "@/lib/trpc";
 
@@ -71,6 +72,8 @@ export function CodeEditorDialog({
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
   const [editorHeight, setEditorHeight] = useState(700);
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
+  const [typesPopoverOpen, setTypesPopoverOpen] = useState(false);
+  const [expandedType, setExpandedType] = useState<string | null>(null);
   
   // Check if label is duplicate (case-insensitive)
   const isDuplicateLabel = useMemo(() => {
@@ -1366,31 +1369,134 @@ ${utilities.map(util => {
                   <Label className="text-sm font-medium">TypeScript Code</Label>
                   <span className="text-xs text-muted-foreground">Autocomplete: Ctrl+Space or type after <code className="px-1">:</code></span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {typeDefinitions && definedTypes.length > 0 ? (
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                      <FileType className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                        {definedTypes.length} custom type{definedTypes.length !== 1 ? 's' : ''}: {definedTypes.slice(0, 3).map(t => t.name).join(', ')}{definedTypes.length > 3 ? '...' : ''}
+                <Popover open={typesPopoverOpen} onOpenChange={setTypesPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-2"
+                    >
+                      <Code2 className="h-3.5 w-3.5" />
+                      <span className="text-xs font-medium">
+                        Available Types ({definedTypes.length + packageTypes.length})
                       </span>
+                      <ChevronDown className={`h-3 w-3 transition-transform ${typesPopoverOpen ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-96 p-0" align="end">
+                    <div className="flex flex-col max-h-96">
+                      {/* Header */}
+                      <div className="px-4 py-3 border-b bg-muted/50">
+                        <h4 className="font-semibold text-sm">Available Types</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Types available for autocomplete
+                        </p>
+                      </div>
+
+                      {/* Content */}
+                      <div className="overflow-y-auto">
+                        {/* Custom Types */}
+                        {definedTypes.length > 0 && (
+                          <div className="p-3 border-b">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileType className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                                Custom Types ({definedTypes.length})
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {definedTypes.map((type) => (
+                                <div key={type.name}>
+                                  <div
+                                    className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-accent/50 transition-colors cursor-pointer"
+                                    onClick={() => setExpandedType(expandedType === type.name ? null : type.name)}
+                                  >
+                                    <code className="text-xs font-mono font-semibold text-foreground">
+                                      {type.name}
+                                    </code>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({type.kind})
+                                    </span>
+                                    {type.properties && type.properties.length > 0 && (
+                                      <>
+                                        <span className="text-xs text-muted-foreground ml-auto">
+                                          {type.properties.length} {type.properties.length === 1 ? 'property' : 'properties'}
+                                        </span>
+                                        <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform ${expandedType === type.name ? 'rotate-90' : ''}`} />
+                                      </>
+                                    )}
+                                  </div>
+                                  {/* Properties List */}
+                                  {expandedType === type.name && type.properties && type.properties.length > 0 && (
+                                    <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-blue-200 dark:border-blue-800 pl-3">
+                                      {type.properties.map((prop) => (
+                                        <div
+                                          key={prop.name}
+                                          className="flex items-start gap-2 px-2 py-1 rounded text-xs"
+                                        >
+                                          <code className="font-mono font-medium text-foreground">
+                                            {prop.name}
+                                          </code>
+                                          <span className="text-muted-foreground">:</span>
+                                          <code className="font-mono text-blue-600 dark:text-blue-400">
+                                            {prop.type}
+                                          </code>
+                                          {!prop.required && (
+                                            <span className="text-xs text-yellow-600 dark:text-yellow-400 ml-auto">
+                                              optional
+                                            </span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Package Types */}
+                        {packageTypes.length > 0 && (
+                          <div className="p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileType className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                              <span className="text-xs font-semibold text-green-600 dark:text-green-400">
+                                Package Types ({packageTypes.length})
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {packageTypes.map((type) => (
+                                <div
+                                  key={type.name}
+                                  className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-accent/50 transition-colors"
+                                >
+                                  <code className="text-xs font-mono font-semibold text-foreground">
+                                    {type.name}
+                                  </code>
+                                  <span className="text-xs text-muted-foreground">
+                                    ({type.kind})
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* No Types */}
+                        {definedTypes.length === 0 && packageTypes.length === 0 && (
+                          <div className="p-8 text-center">
+                            <FileType className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">No custom types defined</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Define types in your code to see them here
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-                      <FileType className="h-3 w-3 text-yellow-600 dark:text-yellow-400" />
-                      <span className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">
-                        No custom types defined
-                      </span>
-                    </div>
-                  )}
-                  {packageTypeDefinitions && packageTypes.length > 0 && (
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md">
-                      <FileType className="h-3 w-3 text-green-600 dark:text-green-400" />
-                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">
-                        {packageTypes.length} package type{packageTypes.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div 
                 className="flex-1 overflow-hidden relative mx-6 mb-4"
@@ -1470,21 +1576,22 @@ ${utilities.map(util => {
             </div>
           </div>
         </div>
-        <DialogFooter className="px-6 py-4 border-t bg-muted/10 flex-shrink-0 gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSave} 
-            className="gap-2"
-            disabled={isDuplicateLabel || !label.trim()}
-            title={isDuplicateLabel ? "Node name must be unique" : !label.trim() ? "Node name cannot be empty" : "Save code (Ctrl+S)"}
-          >
-            <span>Save</span>
-            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
-              <span className="text-xs">Ctrl+S</span>
-            </kbd>
-          </Button>
+        <DialogFooter className="px-6 py-4 border-t bg-background flex-shrink-0">
+          <div className="flex items-center justify-between w-full">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isDuplicateLabel || !label.trim()}
+              title={isDuplicateLabel ? "Node name must be unique" : !label.trim() ? "Node name cannot be empty" : "Save code (Ctrl+S)"}
+            >
+              Save
+              <kbd className="ml-2 pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-secondary px-1.5 font-mono text-[10px] font-medium opacity-70">
+                <span className="text-xs">Ctrl+S</span>
+              </kbd>
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
