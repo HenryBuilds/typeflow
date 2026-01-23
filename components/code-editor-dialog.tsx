@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
-import { autocompletion, completionKeymap, acceptCompletion } from "@codemirror/autocomplete";
-import { keymap } from "@codemirror/view";
-import { indentWithTab } from "@codemirror/commands";
+import { autocompletion, completionKeymap, acceptCompletion, completionStatus, currentCompletions } from "@codemirror/autocomplete";
+import { keymap, EditorView } from "@codemirror/view";
+import { indentWithTab, indentMore } from "@codemirror/commands";
+import { Prec } from "@codemirror/state";
 import { linter } from "@codemirror/lint";
 import { GripVertical, ChevronRight, ChevronDown, ChevronLeft, PanelLeftClose, PanelLeftOpen, FileType } from "lucide-react";
 import { createTypeScriptLinter } from "@/lib/typescript-linter";
@@ -1269,10 +1270,19 @@ ${utilities.map(util => {
                     javascript({ typescript: true }),
                     typeScriptLinter,
                     customAutocomplete,
-                    keymap.of([
-                      ...completionKeymap,
-                      { key: "Tab", run: acceptCompletion },
-                    ]),
+                    Prec.highest(keymap.of([
+                      {
+                        key: "Tab",
+                        run: (view) => {
+                          // Try to accept completion first
+                          const accepted = acceptCompletion(view);
+                          if (accepted) return true;
+                          // If no completion was accepted, do normal indentation
+                          return indentMore(view);
+                        },
+                      },
+                    ])),
+                    keymap.of(completionKeymap),
                   ]}
                   theme={vscodeDark}
                   onChange={(value) => setCode(value)}
@@ -1293,7 +1303,7 @@ ${utilities.map(util => {
                     indentOnInput: true,
                     bracketMatching: true,
                     closeBrackets: true,
-                    autocompletion: true,
+                    autocompletion: false,
                     lintKeymap: true,
                   }}
                   onDrop={(e) => {
