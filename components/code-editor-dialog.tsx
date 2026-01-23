@@ -14,11 +14,13 @@ import { indentWithTab } from "@codemirror/commands";
 import { linter } from "@codemirror/lint";
 import { GripVertical, ChevronRight, ChevronDown, ChevronLeft, PanelLeftClose, PanelLeftOpen, FileType } from "lucide-react";
 import { createTypeScriptLinter } from "@/lib/typescript-linter";
+import { trpc } from "@/lib/trpc";
 
 interface CodeEditorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeId: string;
+  organizationId?: string; // Organization ID for loading credentials
   initialCode?: string;
   initialLabel?: string;
   inputData?: Array<{
@@ -32,6 +34,10 @@ interface CodeEditorDialogProps {
   packageTypeDefinitions?: string; // Type definitions from installed packages
   installedPackages?: Array<{ name: string; version: string }>; // List of installed packages
   existingNodeLabels?: string[]; // List of existing node labels for uniqueness check
+  utilities?: Array<{ // Utilities nodes with their functions
+    label: string;
+    functions: string[]; // List of exported function names
+  }>;
   onSave: (data: { code: string; label: string }) => void;
 }
 
@@ -39,12 +45,14 @@ export function CodeEditorDialog({
   open,
   onOpenChange,
   nodeId,
+  organizationId,
   initialCode = "",
   initialLabel = "Code Node",
   inputData,
   sourceNodeLabels,
   typeDefinitions,
   packageTypeDefinitions,
+  utilities = [],
   installedPackages = [],
   existingNodeLabels = [],
   onSave,
@@ -53,6 +61,12 @@ export function CodeEditorDialog({
   const [label, setLabel] = useState(initialLabel);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<{ view: any } | null>(null);
+
+  // Load credentials for autocomplete
+  const { data: credentials } = trpc.credentials.list.useQuery(
+    { organizationId: organizationId! },
+    { enabled: !!organizationId && open }
+  );
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
   const [editorHeight, setEditorHeight] = useState(700);
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
@@ -401,12 +415,28 @@ export function CodeEditorDialog({
 
   // Available variables for autocomplete and drag & drop
   const availableVariables = useMemo(() => {
+    const credentialsList = credentials?.map(c => c.name).join(", ") || "No credentials available";
     const baseVars = [
+      { name: "$credentials", description: `Available: ${credentialsList}`, example: "$credentials.MyDatabase.query(...)", value: undefined, type: "object" },
       { name: "$json", description: "First item's json from previous node", example: "$json.fieldName", value: undefined, type: "object" },
       { name: "$input", description: "Array of all items from previous node", example: "$input.map(...)", value: undefined, type: "array" },
       { name: "$inputItem", description: "Alias for $json", example: "$inputItem.fieldName", value: undefined, type: "object" },
       { name: "$inputAll", description: "Alias for $input", example: "$inputAll.length", value: undefined, type: "array" },
     ];
+    
+    // Add utilities variables
+    const utilityVars = utilities.map(util => {
+      const sanitizedLabel = util.label.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^[0-9]/, '_$&');
+      const varName = `$${sanitizedLabel}`;
+      const functionsList = util.functions.join(", ");
+      return {
+        name: varName,
+        description: `Utility functions: ${functionsList}`,
+        example: `${varName}.${util.functions[0] || 'functionName'}(...)`,
+        value: undefined,
+        type: "object",
+      };
+    });
     
     // Add actual field paths from input data with their values
     const fieldVars = inputFields.map(field => ({
@@ -418,8 +448,8 @@ export function CodeEditorDialog({
       sourceNodeId: field.sourceNodeId,
     }));
     
-    return [...baseVars, ...fieldVars];
-  }, [inputFields]);
+    return [...baseVars, ...utilityVars, ...fieldVars];
+  }, [inputFields, credentials, utilities]);
 
   // Standard TypeScript types
   const standardTypes = useMemo(() => [
@@ -579,8 +609,75 @@ export function CodeEditorDialog({
     const parts: string[] = [];
     if (typeDefinitions) parts.push(typeDefinitions);
     if (packageTypeDefinitions) parts.push(packageTypeDefinitions);
+    
+    // Add credentials type definitions
+    if (credentials && credentials.length > 0) {
+      const credentialTypes = `
+// Database Credential Types
+interface PostgresCredential {
+  query(sql: string, params?: any[]): Promise<{ rows: any[]; rowCount: number }>;
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+}
+
+interface MySQLCredential {
+  query(sql: string, params?: any[]): Promise<[any[], any]>;
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+}
+
+interface MongoDBCredential {
+  collection(name: string): Promise<any>;
+  getDb(): Promise<any>;
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+}
+
+interface RedisCredential {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+}
+
+// Available Credentials
+interface $Credentials {
+${credentials.map(c => {
+  const typeMap: Record<string, string> = {
+    postgres: 'PostgresCredential',
+    mysql: 'MySQLCredential',
+    mongodb: 'MongoDBCredential',
+    redis: 'RedisCredential',
+  };
+  const credType = typeMap[c.type] || 'any';
+  return `  /** ${c.type} - ${c.description || 'No description'} */\n  ${c.name}: ${credType};`;
+}).join('\n')}
+}
+declare const $credentials: $Credentials;
+`;
+      parts.push(credentialTypes);
+    }
+    
+    // Add utilities type definitions
+    if (utilities && utilities.length > 0) {
+      const utilityTypes = `
+// Utilities Type Definitions
+${utilities.map(util => {
+  const sanitizedLabel = util.label.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^[0-9]/, '_$&');
+  const varName = `$${sanitizedLabel}`;
+  
+  const functionDeclarations = util.functions.map(fn => 
+    `  /** Utility function from ${util.label} */\n  ${fn}(...args: any[]): any;`
+  ).join('\n');
+  
+  return `interface ${varName}Type {\n${functionDeclarations}\n}\ndeclare const ${varName}: ${varName}Type;`;
+}).join('\n\n')}
+`;
+      parts.push(utilityTypes);
+    }
+    
     return parts.join('\n\n');
-  }, [typeDefinitions, packageTypeDefinitions]);
+  }, [typeDefinitions, packageTypeDefinitions, credentials, utilities]);
 
   // Create TypeScript linter with combined type definitions
   const typeScriptLinter = useMemo(() => {
@@ -609,6 +706,144 @@ export function CodeEditorDialog({
               detail: v.example,
             })),
             validFor: /^\$[\w_]*$/,
+          };
+        },
+        // Autocomplete for $credentials.{CredentialName}
+        (context) => {
+          const word = context.matchBefore(/\$credentials\.[\w_]*/);
+          if (!word) return null;
+          
+          if (word.from === word.to && !context.explicit) return null;
+          
+          if (!credentials || credentials.length === 0) {
+            return {
+              from: word.from,
+              options: [{
+                label: "$credentials",
+                type: "variable",
+                info: "⚠️ No credentials configured. Go to Organization → Credentials to add one.",
+              }],
+            };
+          }
+          
+          return {
+            from: word.from + 13, // Length of "$credentials."
+            options: credentials.map(c => ({
+              label: c.name,
+              type: "property",
+              info: `${c.type} database (${c.description || 'No description'})`,
+              detail: `$credentials.${c.name}.query(...)`,
+            })),
+            validFor: /^[\w_]*$/,
+          };
+        },
+        // Autocomplete for $credentials.{CredentialName}.{method}
+        (context) => {
+          const word = context.matchBefore(/\$credentials\.[\w_]+\.[\w_]*/);
+          if (!word) return null;
+          
+          // Extract credential name from word
+          const match = word.text.match(/\$credentials\.([\w_]+)\./);
+          if (!match) return null;
+          
+          const credentialName = match[1];
+          const credential = credentials?.find(c => c.name === credentialName);
+          
+          if (!credential) {
+            return {
+              from: word.from,
+              options: [{
+                label: credentialName,
+                type: "property",
+                info: `⚠️ Credential "${credentialName}" not found. Available: ${credentials?.map(c => c.name).join(", ")}`,
+              }],
+            };
+          }
+          
+          // Get methods based on credential type
+          const methodsByType: Record<string, Array<{ label: string; detail: string; info: string }>> = {
+            postgres: [
+              { label: "query", detail: "query(sql: string, params?: any[])", info: "Execute a SQL query" },
+              { label: "connect", detail: "connect()", info: "Manually connect to database" },
+              { label: "disconnect", detail: "disconnect()", info: "Disconnect from database" },
+            ],
+            mysql: [
+              { label: "query", detail: "query(sql: string, params?: any[])", info: "Execute a SQL query" },
+              { label: "connect", detail: "connect()", info: "Manually connect to database" },
+              { label: "disconnect", detail: "disconnect()", info: "Disconnect from database" },
+            ],
+            mongodb: [
+              { label: "collection", detail: "collection(name: string)", info: "Get a collection" },
+              { label: "getDb", detail: "getDb()", info: "Get database instance" },
+              { label: "connect", detail: "connect()", info: "Manually connect to database" },
+              { label: "disconnect", detail: "disconnect()", info: "Disconnect from database" },
+            ],
+            redis: [
+              { label: "get", detail: "get(key: string)", info: "Get value by key" },
+              { label: "set", detail: "set(key: string, value: string)", info: "Set key-value pair" },
+              { label: "connect", detail: "connect()", info: "Manually connect to Redis" },
+              { label: "disconnect", detail: "disconnect()", info: "Disconnect from Redis" },
+            ],
+          };
+          
+          const methods = methodsByType[credential.type] || [];
+          
+          const dotPosition = word.text.lastIndexOf('.');
+          
+          return {
+            from: word.from + dotPosition + 1,
+            options: methods.map(m => ({
+              label: m.label,
+              type: "method",
+              detail: m.detail,
+              info: m.info,
+            })),
+            validFor: /^[\w_]*$/,
+          };
+        },
+        // Autocomplete for utilities $UtilityName.{function}
+        (context) => {
+          if (!utilities || utilities.length === 0) return null;
+          
+          const word = context.matchBefore(/\$[\w_]+\.[\w_]*/);
+          if (!word) return null;
+          
+          // Skip if it's $credentials, $json, $input, etc.
+          if (word.text.startsWith('$credentials') || 
+              word.text.startsWith('$json') || 
+              word.text.startsWith('$input')) {
+            return null;
+          }
+          
+          // Extract utility name from word
+          const match = word.text.match(/\$([\w_]+)\./);
+          if (!match) return null;
+          
+          const utilityName = match[1];
+          
+          // Check if this matches any utility node
+          const utility = utilities.find(u => {
+            const sanitizedLabel = u.label.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^[0-9]/, '_$&');
+            return sanitizedLabel === utilityName;
+          });
+          
+          // If no utility found, don't provide autocomplete (let other overrides handle it)
+          if (!utility) {
+            return null;
+          }
+          
+          const dotPosition = word.text.lastIndexOf('.');
+          
+          return {
+            from: word.from + dotPosition + 1,
+            options: utility.functions.map(fn => ({
+              label: fn,
+              type: "function",
+              detail: `${fn}(...)`,
+              info: `Utility function from ${utility.label}`,
+              boost: 99, // High priority for utility functions
+            })),
+            validFor: /^[\w_]*$/,
           };
         },
         // Autocomplete for custom types - show types in type positions
@@ -655,6 +890,10 @@ export function CodeEditorDialog({
           
           // For explicit trigger (Ctrl+Space) anywhere
           if (context.explicit) {
+            // Don't show types after $variable. (let other overrides handle it)
+            const beforeDot = context.matchBefore(/\$[\w_]+\.\w*/);
+            if (beforeDot) return null;
+            
             const word = context.matchBefore(/\w*/);
             const typedText = word ? word.text.toLowerCase() : '';
             const from = word && word.text ? word.from : context.pos;
@@ -779,7 +1018,7 @@ export function CodeEditorDialog({
         },
       ],
     });
-  }, [availableVariables, buildTree, allTypes, definedTypes, packageTypes, installedPackages]);
+  }, [availableVariables, buildTree, allTypes, definedTypes, packageTypes, installedPackages, credentials]);
 
   useEffect(() => {
     if (open) {
