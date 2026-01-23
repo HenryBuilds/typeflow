@@ -452,8 +452,16 @@ export function CodeEditorDialog({
     return [...baseVars, ...utilityVars, ...fieldVars];
   }, [inputFields, credentials, utilities]);
 
+  // Type definition for parsed types
+  type ParsedType = {
+    name: string;
+    kind: string;
+    info: string;
+    properties?: Array<{ name: string; type: string; required: boolean }>;
+  };
+
   // Standard TypeScript types
-  const standardTypes = useMemo(() => [
+  const standardTypes = useMemo((): ParsedType[] => [
     // Primitive types
     { name: 'string', kind: 'type', info: 'Primitive string type' },
     { name: 'number', kind: 'type', info: 'Primitive number type' },
@@ -464,7 +472,7 @@ export function CodeEditorDialog({
     { name: 'unknown', kind: 'type', info: 'Unknown type (type-safe any)' },
     { name: 'void', kind: 'type', info: 'Void type (no return value)' },
     { name: 'never', kind: 'type', info: 'Never type (unreachable)' },
-    
+
     // Object types
     { name: 'object', kind: 'type', info: 'Object type' },
     { name: 'Object', kind: 'interface', info: 'Object constructor' },
@@ -474,24 +482,24 @@ export function CodeEditorDialog({
     { name: 'Readonly', kind: 'type', info: 'Readonly<T> - make all properties readonly' },
     { name: 'Pick', kind: 'type', info: 'Pick<T, K> - pick subset of properties' },
     { name: 'Omit', kind: 'type', info: 'Omit<T, K> - omit subset of properties' },
-    
+
     // Array types
     { name: 'Array', kind: 'interface', info: 'Array<T> - array type' },
     { name: 'ReadonlyArray', kind: 'interface', info: 'ReadonlyArray<T> - readonly array' },
-    
+
     // Function types
     { name: 'Function', kind: 'interface', info: 'Function type' },
-    
+
     // Promise types
     { name: 'Promise', kind: 'interface', info: 'Promise<T> - async operation result' },
-    
+
     // Utility types
     { name: 'Exclude', kind: 'type', info: 'Exclude<T, U> - exclude types from union' },
     { name: 'Extract', kind: 'type', info: 'Extract<T, U> - extract types from union' },
     { name: 'NonNullable', kind: 'type', info: 'NonNullable<T> - exclude null and undefined' },
     { name: 'ReturnType', kind: 'type', info: 'ReturnType<T> - get function return type' },
     { name: 'Parameters', kind: 'type', info: 'Parameters<T> - get function parameters' },
-    
+
     // Other common types
     { name: 'Date', kind: 'interface', info: 'Date object' },
     { name: 'Error', kind: 'interface', info: 'Error object' },
@@ -500,30 +508,73 @@ export function CodeEditorDialog({
     { name: 'Set', kind: 'interface', info: 'Set<T> - unique values set' },
   ], []);
 
-  // Helper function to parse type definitions
-  const parseTypes = useCallback((source: string, sourceLabel: string) => {
-    const types: Array<{ name: string; kind: string; info: string }> = [];
-    
+  // Helper function to parse type definitions and extract properties
+  const parseTypes = useCallback((source: string, sourceLabel: string): ParsedType[] => {
+    const types: ParsedType[] = [];
+
     if (!source) return types;
-    
-    // Extract interface names: interface Name { ... }
-    const interfaceRegex = /(?:export\s+)?interface\s+([A-Z_]\w*)/gi;
+
+    // Extract interface with properties: interface Name { prop: type; ... }
+    const interfaceRegex = /(?:export\s+)?interface\s+([A-Z_]\w*)\s*(?:<[^>]*>)?\s*\{([^}]*)\}/gi;
     let match;
     while ((match = interfaceRegex.exec(source)) !== null) {
       const name = match[1];
+      const body = match[2];
+
       // Avoid duplicates
       if (!types.some(t => t.name === name)) {
+        // Extract properties from interface body
+        const properties: Array<{ name: string; type: string; required: boolean }> = [];
+        const propRegex = /(\w+)(\?)?:\s*([^;,\n]+)/g;
+        let propMatch;
+        while ((propMatch = propRegex.exec(body)) !== null) {
+          properties.push({
+            name: propMatch[1],
+            type: propMatch[3].trim(),
+            required: !propMatch[2], // No ? means required
+          });
+        }
+
         types.push({
           name,
           kind: 'interface',
           info: `Interface ${name} (${sourceLabel})`,
+          properties,
         });
       }
     }
-    
-    // Extract type names: type Name = ...
-    const typeRegex = /(?:export\s+)?type\s+([A-Z_]\w*)(?:\s*<[^>]*>)?\s*=/gi;
+
+    // Extract type aliases with object types: type Name = { prop: type; ... }
+    const typeRegex = /(?:export\s+)?type\s+([A-Z_]\w*)(?:\s*<[^>]*>)?\s*=\s*\{([^}]*)\}/gi;
     while ((match = typeRegex.exec(source)) !== null) {
+      const name = match[1];
+      const body = match[2];
+
+      if (!types.some(t => t.name === name)) {
+        // Extract properties from type body
+        const properties: Array<{ name: string; type: string; required: boolean }> = [];
+        const propRegex = /(\w+)(\?)?:\s*([^;,\n]+)/g;
+        let propMatch;
+        while ((propMatch = propRegex.exec(body)) !== null) {
+          properties.push({
+            name: propMatch[1],
+            type: propMatch[3].trim(),
+            required: !propMatch[2],
+          });
+        }
+
+        types.push({
+          name,
+          kind: 'type',
+          info: `Type ${name} (${sourceLabel})`,
+          properties,
+        });
+      }
+    }
+
+    // Extract simple type aliases (non-object types)
+    const simpleTypeRegex = /(?:export\s+)?type\s+([A-Z_]\w*)(?:\s*<[^>]*>)?\s*=\s*([^{][^;\n]+)/gi;
+    while ((match = simpleTypeRegex.exec(source)) !== null) {
       const name = match[1];
       if (!types.some(t => t.name === name)) {
         types.push({
@@ -533,7 +584,7 @@ export function CodeEditorDialog({
         });
       }
     }
-    
+
     // Extract enum names: enum Name { ... }
     const enumRegex = /(?:export\s+)?(?:const\s+)?enum\s+([A-Z_]\w*)/gi;
     while ((match = enumRegex.exec(source)) !== null) {
@@ -546,7 +597,7 @@ export function CodeEditorDialog({
         });
       }
     }
-    
+
     // Extract class names: class Name { ... }
     const classRegex = /(?:export\s+)?(?:abstract\s+)?class\s+([A-Z_]\w*)/gi;
     while ((match = classRegex.exec(source)) !== null) {
@@ -559,7 +610,7 @@ export function CodeEditorDialog({
         });
       }
     }
-    
+
     // Extract namespace/module names: namespace Name { ... } or declare module 'name' { ... }
     const namespaceRegex = /(?:export\s+)?(?:declare\s+)?namespace\s+([A-Z_]\w*)/gi;
     while ((match = namespaceRegex.exec(source)) !== null) {
@@ -572,7 +623,7 @@ export function CodeEditorDialog({
         });
       }
     }
-    
+
     return types;
   }, []);
 
@@ -1016,6 +1067,107 @@ ${utilities.map(util => {
             from: dotPos,
             options: properties,
           };
+        },
+        // Autocomplete for object literals with type annotations
+        // Example: const user: User = { <-- suggest User properties here
+        (context) => {
+          // Get more context - look at multiple lines before cursor
+          const doc = context.state.doc;
+          const pos = context.pos;
+
+          // Get text from start of document to cursor (max 500 chars back for performance)
+          const startPos = Math.max(0, pos - 500);
+          const textBefore = doc.sliceString(startPos, pos);
+
+          // Check if we're inside an object literal with a type annotation
+          // Multi-line pattern: const x: TypeName = {
+          //   ... (could be multiple lines)
+          //   <cursor here>
+          // Use [\s\S] instead of . with s flag for compatibility
+          const typeAnnotationMatch = textBefore.match(/(?:const|let|var)\s+\w+\s*:\s*(\w+)\s*=\s*\{[^}]*$/);
+
+          if (typeAnnotationMatch) {
+            const typeName = typeAnnotationMatch[1];
+
+            console.log('Found type annotation:', typeName);
+            console.log('Available types:', allTypes.map(t => t.name).join(', '));
+
+            // Find the type in our parsed types
+            const typeInfo = allTypes.find(t => t.name === typeName);
+
+            console.log('Type info found:', typeInfo);
+
+            if (typeInfo && typeInfo.properties && typeInfo.properties.length > 0) {
+              console.log('Properties:', typeInfo.properties);
+
+              // Get already defined properties in the object
+              const objectContentMatch = textBefore.match(/\{([^}]*)$/);
+              const objectContent = objectContentMatch ? objectContentMatch[1] : '';
+              const definedProps = objectContent.match(/(\w+)\s*:/g)?.map(p => p.replace(':', '').trim()) || [];
+
+              console.log('Defined props:', definedProps);
+
+              // Filter out already defined properties
+              const availableProps = typeInfo.properties.filter(
+                prop => !definedProps.includes(prop.name)
+              );
+
+              console.log('Available props:', availableProps);
+
+              if (availableProps.length > 0) {
+                const word = context.matchBefore(/\w*/);
+                const from = word && word.text ? word.from : context.pos;
+
+                return {
+                  from,
+                  options: availableProps.map(prop => ({
+                    label: prop.name,
+                    type: 'property',
+                    detail: prop.type,
+                    info: prop.required ? `Required property (${prop.type})` : `Optional property (${prop.type})`,
+                    // Boost required properties
+                    boost: prop.required ? 99 : 50,
+                    // Apply the property with ": " suffix for better UX
+                    apply: `${prop.name}: `,
+                  })),
+                  validFor: /^\w*$/,
+                };
+              }
+            }
+          }
+
+          return null;
+        },
+        // CATCH-ALL OVERRIDE (MUST BE LAST): Block JavaScript's built-in autocomplete
+        // This prevents suggestions for non-existent properties like z.User
+        (context) => {
+          // Get the text before cursor to check what the user is typing
+          const line = context.state.doc.lineAt(context.pos);
+          const textBefore = line.text.slice(0, context.pos - line.from);
+
+          // Check if we're typing after a dot (property access)
+          const dotMatch = textBefore.match(/([\w]+)\.([\w]*)$/);
+
+          if (dotMatch) {
+            const objectName = dotMatch[1];
+
+            // Allow our custom overrides to handle these cases
+            if (objectName.startsWith('$') ||
+                objectName === 'credentials' ||
+                textBefore.includes('$credentials.')) {
+              return null; // Let our custom overrides handle it
+            }
+
+            // For everything else (like z., axios., etc.), block autocomplete
+            // Return empty options to prevent wrong suggestions
+            return {
+              from: context.pos,
+              options: [],
+            };
+          }
+
+          // Allow normal autocomplete for non-property access
+          return null;
         },
       ],
     });
