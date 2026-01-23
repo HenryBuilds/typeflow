@@ -21,6 +21,7 @@ import { TriggerNode } from "./nodes/trigger-node";
 import { WorkflowNode } from "./nodes/workflow-node";
 import { WebhookNode } from "./nodes/webhook-node";
 import { WebhookResponseNode } from "./nodes/webhook-response-node";
+import { UtilitiesNode } from "./nodes/utilities-node";
 import { CodeEditorDialog } from "./code-editor-dialog";
 
 const nodeTypes: NodeTypes = {
@@ -29,9 +30,11 @@ const nodeTypes: NodeTypes = {
   workflow: WorkflowNode,
   webhook: WebhookNode,
   webhookResponse: WebhookResponseNode,
+  utilities: UtilitiesNode,
 };
 
 interface WorkflowEditorProps {
+  organizationId?: string; // Organization ID for loading credentials
   workflow: {
     id: string;
     name: string;
@@ -80,6 +83,7 @@ interface WorkflowEditorProps {
 }
 
 export function WorkflowEditor({ 
+  organizationId,
   workflow, 
   onSave, 
   getNodesRef, 
@@ -343,6 +347,23 @@ export function WorkflowEditor({
           },
         };
       }
+      if (node.type === "utilities") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              setEditingNodeId(nodeId);
+              setEditingNode(node);
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+          },
+        };
+      }
       return {
         ...node,
         data: {
@@ -443,7 +464,7 @@ export function WorkflowEditor({
         y: event.clientY,
       });
 
-      const baseLabel = type === "trigger" ? "Trigger" : type === "code" ? "Code Node" : type === "webhook" ? "Webhook" : type === "webhookResponse" ? "Webhook Response" : "Node";
+      const baseLabel = type === "trigger" ? "Trigger" : type === "code" ? "Code Node" : type === "webhook" ? "Webhook" : type === "webhookResponse" ? "Webhook Response" : type === "utilities" ? "Utilities" : "Node";
       const uniqueLabel = generateUniqueLabel(baseLabel, nodes);
 
       // Generate a proper UUID for the node
@@ -502,11 +523,20 @@ export function WorkflowEditor({
           className="bg-background"
         >
           <Controls />
-          <MiniMap />
+          <MiniMap 
+            style={{
+              height: 100,
+              width: 150,
+            }}
+            zoomable
+            pannable
+            nodeStrokeWidth={3}
+            maskColor="rgba(0, 0, 0, 0.6)"
+          />
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
         </ReactFlow>
       </div>
-      {editingNode && editingNodeId && (editingNode.type === "code" || editingNode.type === "webhookResponse") && (() => {
+      {editingNode && editingNodeId && (editingNode.type === "code" || editingNode.type === "webhookResponse" || editingNode.type === "utilities") && (() => {
         // Get the latest node data with inputData from nodesWithHandlers
         const latestNode = nodesWithHandlers.find(n => n.id === editingNodeId);
         const nodeInputData = latestNode?.data?.inputData || editingNode.data.inputData;
@@ -522,7 +552,44 @@ export function WorkflowEditor({
           });
         }
         
-        const defaultLabel = editingNode.type === "webhookResponse" ? "Webhook Response" : "Code Node";
+        const defaultLabel = editingNode.type === "webhookResponse" ? "Webhook Response" : editingNode.type === "utilities" ? "Utilities" : "Code Node";
+        
+        // Extract utilities from all utilities nodes
+        const utilities = nodes
+          .filter(n => n.type === "utilities" && n.data?.config?.code)
+          .map(n => {
+            const code = n.data.config.code as string;
+            const label = n.data.label || "Utilities";
+            
+            // Parse the code to extract exported function names
+            const functions: string[] = [];
+            
+            // Match function declarations: function name(...) { ... }
+            const functionMatches = code.matchAll(/function\s+([a-zA-Z_$][\w$]*)\s*\(/g);
+            for (const match of functionMatches) {
+              functions.push(match[1]);
+            }
+            
+            // Match arrow functions: const name = (...) => ...
+            const arrowMatches = code.matchAll(/const\s+([a-zA-Z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g);
+            for (const match of arrowMatches) {
+              functions.push(match[1]);
+            }
+            
+            // Match named exports in module.exports
+            const exportMatch = code.match(/module\.exports\s*=\s*\{([^}]+)\}/);
+            if (exportMatch) {
+              const exportedNames = exportMatch[1]
+                .split(',')
+                .map(name => name.trim().split(':')[0].trim())
+                .filter(Boolean);
+              // Use exported names if available, otherwise use all found functions
+              return { label, functions: exportedNames.length > 0 ? exportedNames : functions };
+            }
+            
+            return { label, functions };
+          })
+          .filter(u => u.functions.length > 0);
         
         return (
           <CodeEditorDialog
@@ -534,6 +601,7 @@ export function WorkflowEditor({
               }
             }}
             nodeId={editingNodeId || ""}
+            organizationId={organizationId}
             initialCode={(editingNode.data.config?.code as string) || ""}
             initialLabel={editingNode.data.label || defaultLabel}
             inputData={nodeInputData}
@@ -545,6 +613,7 @@ export function WorkflowEditor({
               .filter(n => n.id !== editingNodeId)
               .map(n => n.data?.label?.toString().trim())
               .filter(Boolean) as string[]}
+            utilities={utilities}
             onSave={handleCodeSave}
           />
         );

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -48,6 +48,7 @@ export default function WorkflowEditorPage() {
   const [packagesDialogOpen, setPackagesDialogOpen] = useState(false);
   const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
   const [editingWebhookNode, setEditingWebhookNode] = useState<Node | null>(null);
+  const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [workflowLogs, setWorkflowLogs] = useState<WorkflowLog[]>([]);
   const [logPanelCollapsed, setLogPanelCollapsed] = useState(false); // Start expanded by default so it's visible
   const [nodeOutputs, setNodeOutputs] = useState<Record<
@@ -372,6 +373,67 @@ export default function WorkflowEditorPage() {
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [handleSave]);
 
+  // Debug functions
+  const exportWorkflowJSON = useCallback(() => {
+    const currentNodes = getNodesRef.current?.() || [];
+    const currentEdges = getEdgesRef.current?.() || [];
+    
+    const exportData = {
+      workflow: {
+        id: workflow?.id,
+        name: workflow?.name,
+        description: workflow?.description,
+        metadata: workflow?.metadata,
+      },
+      nodes: currentNodes,
+      edges: currentEdges,
+      nodeOutputs,
+      selectedNodeId,
+      timestamp: new Date().toISOString(),
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `workflow-${workflow?.name || 'export'}-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [workflow, getNodesRef, getEdgesRef, nodeOutputs, selectedNodeId]);
+
+  const copyWorkflowState = useCallback(() => {
+    const currentNodes = getNodesRef.current?.() || [];
+    const currentEdges = getEdgesRef.current?.() || [];
+    
+    const stateData = {
+      nodes: currentNodes.length,
+      edges: currentEdges.length,
+      selectedNode: selectedNodeId,
+      executingNode: executingNodeId,
+      nodeOutputs: Object.keys(nodeOutputs).length,
+      logs: workflowLogs.length,
+    };
+    
+    navigator.clipboard.writeText(JSON.stringify(stateData, null, 2));
+    alert('Workflow state copied to clipboard!');
+  }, [getNodesRef, getEdgesRef, selectedNodeId, executingNodeId, nodeOutputs, workflowLogs]);
+
+  const logWorkflowState = useCallback(() => {
+    const currentNodes = getNodesRef.current?.() || [];
+    const currentEdges = getEdgesRef.current?.() || [];
+    
+    console.group('🐛 Workflow Debug State');
+    console.log('Workflow:', workflow);
+    console.log('Nodes:', currentNodes);
+    console.log('Edges:', currentEdges);
+    console.log('Node Outputs:', nodeOutputs);
+    console.log('Selected Node:', selectedNodeId);
+    console.log('Executing Node:', executingNodeId);
+    console.log('Workflow Logs:', workflowLogs);
+    console.log('Installed Packages:', installedPackages);
+    console.groupEnd();
+  }, [workflow, getNodesRef, getEdgesRef, nodeOutputs, selectedNodeId, executingNodeId, workflowLogs, installedPackages]);
+
   // Initialize editorData when workflow loads
   useEffect(() => {
     if (workflow && !editorData) {
@@ -467,6 +529,36 @@ export default function WorkflowEditorPage() {
             <Package className="h-4 w-4 mr-2" />
             Packages
           </Button>
+          
+          {/* Debug Tools */}
+          <div className="flex items-center gap-2 border-l pl-2 ml-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDebugPanelOpen(!debugPanelOpen)}
+              title="Toggle Debug Panel"
+            >
+              <Bug className="h-4 w-4 mr-2" />
+              Debug
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={exportWorkflowJSON}
+              title="Export Workflow as JSON"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={logWorkflowState}
+              title="Log State to Console"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+          </div>
+          
           <Button
             variant="outline"
             size="sm"
@@ -568,96 +660,149 @@ export default function WorkflowEditorPage() {
             leftSidebarOpen ? 'w-64' : 'w-0'
           }`}
         >
-          <div className="w-64 h-full flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h3 className="text-sm font-semibold">Add Nodes</h3>
+          <div className="w-64 h-full flex flex-col bg-background border-r">
+            <div className="flex items-center justify-between px-4 py-4 border-b">
+              <h3 className="text-sm font-semibold">Components</h3>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 hover:bg-accent border hover:border-border"
+                className="h-7 w-7 p-0"
                 onClick={() => setLeftSidebarOpen(false)}
                 title="Close sidebar"
               >
-                <PanelLeftClose className="h-4 w-4" />
+                <PanelLeftClose className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="space-y-2">
-                <div
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("application/reactflow", "trigger");
-                  }}
-                  className="p-3 rounded-md border bg-background hover:bg-accent cursor-move transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm font-medium">Trigger</span>
+            <div className="flex-1 overflow-y-auto p-3">
+              {/* Triggers Section */}
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Triggers</h4>
+                <div className="space-y-1.5">
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "trigger");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                        <Zap className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Trigger</span>
+                        <p className="text-xs text-muted-foreground truncate">Start workflow</p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Start your workflow
-                  </p>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "webhook");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                        <Webhook className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Webhook</span>
+                        <p className="text-xs text-muted-foreground truncate">Receive requests</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("application/reactflow", "code");
-                  }}
-                  className="p-3 rounded-md border bg-background hover:bg-accent cursor-move transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Code className="h-4 w-4" />
-                    <span className="text-sm font-medium">Code Node</span>
+              </div>
+              
+              {/* Actions Section */}
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Actions</h4>
+                <div className="space-y-1.5">
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "code");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
+                        <Code className="h-4 w-4 text-secondary-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Code</span>
+                        <p className="text-xs text-muted-foreground truncate">Execute TypeScript</p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Execute TypeScript code
-                  </p>
+                  
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "webhookResponse");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
+                        <Send className="h-4 w-4 text-secondary-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Response</span>
+                        <p className="text-xs text-muted-foreground truncate">Send HTTP response</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("application/reactflow", "webhook");
-                  }}
-                  className="p-3 rounded-md border bg-background hover:bg-accent cursor-move transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Webhook className="h-4 w-4 text-purple-500" />
-                    <span className="text-sm font-medium">Webhook</span>
+              </div>
+              
+              {/* Utilities Section */}
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Utilities</h4>
+                <div className="space-y-1.5">
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "utilities");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
+                        <Wrench className="h-4 w-4 text-secondary-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Utilities</span>
+                        <p className="text-xs text-muted-foreground truncate">Shared functions</p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Receive HTTP requests
-                  </p>
                 </div>
-                <div
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("application/reactflow", "webhookResponse");
-                  }}
-                  className="p-3 rounded-md border bg-background hover:bg-accent cursor-move transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Send className="h-4 w-4 text-indigo-500" />
-                    <span className="text-sm font-medium">Webhook Response</span>
+              </div>
+              
+              {/* Other Section */}
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Other</h4>
+                <div className="space-y-1.5">
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "workflow");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
+                        <Plus className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Generic</span>
+                        <p className="text-xs text-muted-foreground truncate">Basic node</p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Send HTTP response
-                  </p>
-                </div>
-                <div
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("application/reactflow", "workflow");
-                  }}
-                  className="p-3 rounded-md border bg-background hover:bg-accent cursor-move transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    <span className="text-sm font-medium">Generic Node</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Basic workflow node
-                  </p>
                 </div>
               </div>
             </div>
@@ -666,24 +811,23 @@ export default function WorkflowEditorPage() {
 
         {/* Toggle button when left sidebar is closed */}
         {!leftSidebarOpen && (
-          <div className="absolute left-0 top-0 bottom-0 z-10 flex items-start pt-4">
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              className="h-12 w-10 rounded-r-md rounded-l-none shadow-lg hover:shadow-xl transition-all"
-              onClick={() => setLeftSidebarOpen(true)}
-              title="Open sidebar"
-            >
-              <PanelLeftOpen className="h-5 w-5" />
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute left-2 top-20 z-10 h-8 w-8 p-0 rounded-md hover:bg-accent"
+            onClick={() => setLeftSidebarOpen(true)}
+            title="Show components"
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </Button>
         )}
 
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-hidden relative">
               <WorkflowEditor
+                organizationId={organizationId}
                 workflow={workflow as any}
                 getNodesRef={getNodesRef}
                 getEdgesRef={getEdgesRef}
@@ -706,6 +850,157 @@ export default function WorkflowEditorPage() {
                 }}
               />
             </div>
+            
+            {/* Debug Panel */}
+            {debugPanelOpen && (
+              <div className="absolute bottom-16 left-0 right-0 bg-card border-t p-6 z-10 max-h-96 overflow-y-auto shadow-lg">
+                <div className="max-w-6xl mx-auto">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Bug className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold">Developer Tools</h3>
+                        <p className="text-sm text-muted-foreground">Debug and inspect your workflow</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDebugPanelOpen(false)}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    {/* Quick Stats */}
+                    <div className="p-4 rounded-lg border bg-background">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-1.5 rounded bg-primary/10">
+                          <Code className="h-4 w-4 text-primary" />
+                        </div>
+                        <h4 className="font-semibold text-sm">Workflow Stats</h4>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Nodes</span>
+                          <span className="font-medium">{getNodesRef.current?.().length || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Connections</span>
+                          <span className="font-medium">{getEdgesRef.current?.().length || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Packages</span>
+                          <span className="font-medium">{installedPackages?.length || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Execution Info */}
+                    <div className="p-4 rounded-lg border bg-background">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-1.5 rounded bg-secondary/30">
+                          <Play className="h-4 w-4 text-secondary-foreground" />
+                        </div>
+                        <h4 className="font-semibold text-sm">Execution</h4>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Outputs</span>
+                          <span className="font-medium">{Object.keys(nodeOutputs).length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Logs</span>
+                          <span className="font-medium">{workflowLogs.length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Status</span>
+                          {executingNodeId ? (
+                            <span className="font-medium text-primary">Running</span>
+                          ) : (
+                            <span className="font-medium text-muted-foreground">Idle</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Selected Node */}
+                    <div className="p-4 rounded-lg border bg-background">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-1.5 rounded bg-primary/10">
+                          <Zap className="h-4 w-4 text-primary" />
+                        </div>
+                        <h4 className="font-semibold text-sm">Selection</h4>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        {selectedNodeId ? (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Selected</span>
+                              <span className="font-medium truncate max-w-[120px]" title={selectedNodeId}>
+                                {selectedNodeId.substring(0, 8)}...
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Has Output</span>
+                              <span className="font-medium">
+                                {nodeOutputs[selectedNodeId] ? 'Yes' : 'No'}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-muted-foreground">No node selected</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Actions */}
+                  <div className="p-4 rounded-lg border bg-background">
+                    <h4 className="font-semibold text-sm mb-3">Actions</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={exportWorkflowJSON}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export JSON
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyWorkflowState}
+                      >
+                        Copy State
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={logWorkflowState}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Log to Console
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Selected Node Output */}
+                  {selectedNodeId && nodeOutputs[selectedNodeId] && (
+                    <div className="mt-4 p-4 rounded-lg border bg-background">
+                      <h4 className="font-semibold text-sm mb-3">Node Output Preview</h4>
+                      <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-40">
+                        {JSON.stringify(nodeOutputs[selectedNodeId], null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             
             {/* Workflow Log Panel at the bottom */}
             <WorkflowLogPanel
@@ -734,18 +1029,16 @@ export default function WorkflowEditorPage() {
 
           {/* Toggle button when right sidebar is closed */}
           {!rightSidebarOpen && (
-            <div className="absolute right-0 top-0 bottom-0 z-10 flex items-start pt-4">
-              <Button
-                type="button"
-                variant="default"
-                size="sm"
-                className="h-12 w-10 rounded-l-md rounded-r-none shadow-lg hover:shadow-xl transition-all"
-                onClick={() => setRightSidebarOpen(true)}
-                title="Open output panel"
-              >
-                <PanelRightOpen className="h-5 w-5" />
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="absolute right-2 top-20 z-10 h-8 w-8 p-0 rounded-md hover:bg-accent"
+              onClick={() => setRightSidebarOpen(true)}
+              title="Show output"
+            >
+              <PanelRightOpen className="h-4 w-4" />
+            </Button>
           )}
         </div>
       </div>
