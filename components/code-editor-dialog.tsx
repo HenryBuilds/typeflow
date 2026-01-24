@@ -981,7 +981,10 @@ ${utilities.map(util => {
           const importMatch = lineText.match(/^import\s+.*\s+from\s+['"]([^'"]*)/);
           if (importMatch) {
             const packagePrefix = importMatch[1].toLowerCase();
-            const quotePos = lineText.lastIndexOf(importMatch[1]);
+            // Find the position of the opening quote, then add 1 to get the start of the package name
+            const quoteMatch = lineText.match(/from\s+['"]/);
+            if (!quoteMatch) return null;
+            const quotePos = lineText.indexOf(quoteMatch[0]) + quoteMatch[0].length;
             const from = line.from + quotePos;
             
             return {
