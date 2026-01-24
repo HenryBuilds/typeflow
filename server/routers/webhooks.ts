@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, organizationProcedure } from "../trpc";
 import { db } from "@/db/db";
-import { webhooks, webhookRequests } from "@/db/schema";
+import { webhooks, webhookRequests, workflows } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 export const webhooksRouter = router({
@@ -68,6 +68,18 @@ export const webhooksRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Get workflow to inherit isActive status
+      const workflow = await db.query.workflows.findFirst({
+        where: and(
+          eq(workflows.id, input.workflowId),
+          eq(workflows.organizationId, ctx.organization.id)
+        ),
+      });
+
+      if (!workflow) {
+        throw new Error("Workflow not found");
+      }
+
       const [webhook] = await db
         .insert(webhooks)
         .values({
@@ -78,6 +90,7 @@ export const webhooksRouter = router({
           authType: input.authType,
           authConfig: input.authConfig,
           requestSchema: input.requestSchema,
+          isActive: workflow.isActive, // Inherit from workflow
         })
         .returning();
 

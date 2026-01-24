@@ -18,6 +18,7 @@ interface ExecutionItem {
 
 interface NodeExecutionResult {
   nodeId: string;
+  nodeLabel?: string; // Store label for matching when IDs change
   status: "completed" | "failed";
   output?: ExecutionItem[]; // Array of execution items
   error?: string;
@@ -117,6 +118,7 @@ export class WorkflowExecutor {
         // Mark as executed successfully
         nodeResults[utilityNode.id] = {
           nodeId: utilityNode.id,
+          nodeLabel: utilityNode.label,
           status: "completed",
           output: [{ json: { exports: Object.keys(exports) } }],
           duration: 0,
@@ -124,6 +126,7 @@ export class WorkflowExecutor {
       } catch (error: any) {
         nodeResults[utilityNode.id] = {
           nodeId: utilityNode.id,
+          nodeLabel: utilityNode.label,
           status: "failed",
           error: error.message,
           duration: 0,
@@ -244,6 +247,7 @@ export class WorkflowExecutor {
         nodeOutputs.set(currentNodeId, outputItems);
         nodeResults[currentNodeId] = {
           nodeId: currentNodeId,
+          nodeLabel: currentNode?.label,
           status: "completed",
           output: outputItems,
           duration,
@@ -268,6 +272,7 @@ export class WorkflowExecutor {
 
         nodeResults[currentNodeId] = {
           nodeId: currentNodeId,
+          nodeLabel: currentNode?.label,
           status: "failed",
           error: errorMessage,
           duration,
@@ -346,6 +351,7 @@ export class WorkflowExecutor {
         // Mark as executed successfully
         nodeResults[utilityNode.id] = {
           nodeId: utilityNode.id,
+          nodeLabel: utilityNode.label,
           status: "completed",
           output: [{ json: { exports: Object.keys(exports) } }],
           duration: 0,
@@ -353,6 +359,7 @@ export class WorkflowExecutor {
       } catch (error: any) {
         nodeResults[utilityNode.id] = {
           nodeId: utilityNode.id,
+          nodeLabel: utilityNode.label,
           status: "failed",
           error: error.message,
           duration: 0,
@@ -476,6 +483,7 @@ export class WorkflowExecutor {
         nodeOutputs.set(currentNodeId, outputItems);
         nodeResults[currentNodeId] = {
           nodeId: currentNodeId,
+          nodeLabel: currentNode?.label,
           status: "completed",
           output: outputItems, // Store items array
           duration,
@@ -497,6 +505,7 @@ export class WorkflowExecutor {
 
         nodeResults[currentNodeId] = {
           nodeId: currentNodeId,
+          nodeLabel: currentNode?.label,
           status: "failed",
           error: errorMessage,
           duration,

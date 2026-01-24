@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, organizationProcedure } from "../trpc";
 import { db } from "@/db/db";
-import { workflows, nodes, connections } from "@/db/schema";
+import { workflows, nodes, connections, webhooks } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
 export const workflowsRouter = router({
@@ -104,6 +104,22 @@ export const workflowsRouter = router({
 
       if (!updated) {
         throw new Error("Workflow not found");
+      }
+
+      // Sync webhook isActive status when workflow isActive changes
+      if (input.isActive !== undefined) {
+        await db
+          .update(webhooks)
+          .set({
+            isActive: input.isActive,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(webhooks.workflowId, id),
+              eq(webhooks.organizationId, ctx.organization.id)
+            )
+          );
       }
 
       return updated;

@@ -75,8 +75,9 @@ export function WebhookDialog({
     }
   }, [open]);
 
-  const webhookUrl = webhookId
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/${organizationId}/${path}`
+  // Always show the URL based on path (not just when saved)
+  const webhookUrl = path.trim()
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/${organizationId}/${path.trim()}`
     : null;
 
   const handleSave = async () => {

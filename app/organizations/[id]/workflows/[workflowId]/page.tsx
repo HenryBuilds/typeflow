@@ -5,13 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench, Power, Copy, Check, History } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
 import { TypeDefinitionsDialog } from "@/components/type-definitions-dialog";
 import { PackagesDialog } from "@/components/packages-dialog";
 import { WebhookDialog } from "@/components/webhook-dialog";
+import { ExecutionsPanel } from "@/components/executions-panel";
 import { useSaveWorkflow } from "@/hooks/use-workflows";
 import { Node, Edge } from "reactflow";
 
@@ -60,9 +61,37 @@ export default function WorkflowEditorPage() {
       duration?: number;
     }
   >>({});
+  const [urlCopied, setUrlCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<"editor" | "executions">("editor");
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
+  const [executionNodeOutputs, setExecutionNodeOutputs] = useState<Record<
+    string,
+    {
+      status: "pending" | "running" | "completed" | "failed";
+      output?: unknown;
+      error?: string;
+      duration?: number;
+    }
+  > | null>(null);
+  
+  const webhookNode = workflow?.nodes.find((n) => n.type === "webhook");
+  const webhookPath = webhookNode?.config?.path as string | undefined;
+  const webhookUrl = webhookPath
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/${organizationId}/${webhookPath}`
+    : null;
+
+  const handleCopyWebhookUrl = () => {
+    if (webhookUrl) {
+      navigator.clipboard.writeText(webhookUrl);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
+    }
+  };
+
   const saveMutation = useSaveWorkflow(organizationId);
   const runMutation = trpc.executions.run.useMutation();
   const runUntilNodeMutation = trpc.executions.runUntilNode.useMutation();
+  const updateWorkflowMutation = trpc.workflows.update.useMutation();
   const getNodesRef = useRef<(() => Node[]) | null>(null);
   const getEdgesRef = useRef<(() => Edge[]) | null>(null);
   const utils = trpc.useUtils();
@@ -298,6 +327,34 @@ export default function WorkflowEditorPage() {
     });
   }, [workflow, saveMutation, organizationId, workflowId, utils]);
 
+  const handleToggleActive = useCallback(() => {
+    if (!workflow) return;
+
+    const newActiveState = !workflow.isActive;
+
+    updateWorkflowMutation.mutate(
+      {
+        organizationId: organizationId,
+        id: workflow.id,
+        isActive: newActiveState,
+      },
+      {
+        onSuccess: async () => {
+          addLog({
+            level: "info",
+            message: `Workflow ${newActiveState ? "activated" : "deactivated"}`,
+          });
+          await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+          await utils.workflows.getById.refetch({ organizationId, id: workflowId });
+        },
+        onError: (error) => {
+          console.error("Error toggling workflow active state:", error);
+          alert(`Error: ${error.message}`);
+        },
+      }
+    );
+  }, [workflow, updateWorkflowMutation, organizationId, workflowId, utils, addLog]);
+
   const handleSave = useCallback(() => {
     if (!workflow) {
       return;
@@ -509,8 +566,49 @@ export default function WorkflowEditorPage() {
               </p>
             )}
           </div>
+
+          {/* Tab Switcher */}
+          <div className="flex items-center gap-1 ml-4 p-1 bg-muted rounded-lg">
+            <Button
+              variant={activeTab === "editor" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("editor")}
+              className="h-7 px-3"
+            >
+              <Code className="h-3.5 w-3.5 mr-1.5" />
+              Editor
+            </Button>
+            <Button
+              variant={activeTab === "executions" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("executions")}
+              className="h-7 px-3"
+            >
+              <History className="h-3.5 w-3.5 mr-1.5" />
+              Executions
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Workflow Active Toggle */}
+          <Button
+            variant={workflow.isActive ? "default" : "outline"}
+            size="sm"
+            onClick={handleToggleActive}
+            disabled={updateWorkflowMutation.isPending}
+            title={workflow.isActive ? "Workflow is active - click to deactivate" : "Workflow is inactive - click to activate"}
+            className={workflow.isActive ? "bg-green-600 hover:bg-green-700" : ""}
+          >
+            <Power className="h-4 w-4 mr-2" />
+            {updateWorkflowMutation.isPending
+              ? "Updating..."
+              : workflow.isActive
+              ? "Active"
+              : "Inactive"}
+          </Button>
+
+          <div className="h-4 w-px bg-border" />
+
           <Button
             variant="outline"
             size="sm"
@@ -654,8 +752,57 @@ export default function WorkflowEditorPage() {
         </div>
       </div>
       <div className="flex-1 flex overflow-hidden relative">
+        {activeTab === "executions" ? (
+          <>
+            {/* Executions List - Left Side */}
+            <div className="w-80 border-r bg-background shrink-0 overflow-hidden">
+              <ExecutionsPanel
+                workflowId={workflowId}
+                organizationId={organizationId}
+                selectedExecutionId={selectedExecutionId}
+                onSelectExecution={(executionId, nodeOutputs) => {
+                  setSelectedExecutionId(executionId);
+                  setExecutionNodeOutputs(nodeOutputs);
+                }}
+              />
+            </div>
+
+            {/* Workflow Editor - Right Side (Read-only view of execution) */}
+            <div className="flex-1 overflow-hidden">
+              {selectedExecutionId && executionNodeOutputs ? (
+                <>
+                  {console.log("Rendering WorkflowEditor with executionNodeOutputs:", executionNodeOutputs)}
+                  {console.log("Workflow nodes:", workflow?.nodes?.map(n => ({ id: n.id, label: n.label })))}
+                <WorkflowEditor
+                  organizationId={organizationId}
+                  workflow={workflow as any}
+                  getNodesRef={{ current: null }}
+                  getEdgesRef={{ current: null }}
+                  selectedNodeId={selectedNodeId}
+                  onNodeSelect={setSelectedNodeId}
+                  executingNodeId={null}
+                  nodeOutputs={executionNodeOutputs}
+                />
+                </>
+              ) : (
+                <div className="h-full flex items-center justify-center bg-muted/20">
+                  <div className="text-center p-8">
+                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                      <History className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-sm font-medium mb-1">Select an Execution</h3>
+                    <p className="text-xs text-muted-foreground max-w-[250px]">
+                      Click on an execution from the list to view how the workflow ran.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
         {/* Node Palette Sidebar */}
-        <div 
+        <div
           className={`border-r bg-muted/50 transition-all duration-300 ease-in-out overflow-hidden shrink-0 ${
             leftSidebarOpen ? 'w-64' : 'w-0'
           }`}
@@ -1041,6 +1188,8 @@ export default function WorkflowEditorPage() {
             </Button>
           )}
         </div>
+          </>
+        )}
       </div>
 
       {/* Type Definitions Dialog */}
