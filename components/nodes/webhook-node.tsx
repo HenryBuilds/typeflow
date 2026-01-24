@@ -25,7 +25,8 @@ interface WebhookNodeData {
   isExecuting?: boolean;
   executionStatus?: "pending" | "running" | "completed" | "failed";
   errorMessage?: string;
-  webhookUrl?: string; // Full URL to the webhook endpoint
+  webhookUrl?: string; // Full URL to the webhook endpoint (only set when workflow is active)
+  isWorkflowActive?: boolean; // Whether the workflow is currently active
 }
 
 export const WebhookNode = memo(({ data, selected, id }: NodeProps<WebhookNodeData>) => {
@@ -127,7 +128,16 @@ export const WebhookNode = memo(({ data, selected, id }: NodeProps<WebhookNodeDa
           <span>/webhook/{data.config.path}</span>
         </div>
       )}
-      
+
+      {/* Show inactive status when workflow is not active */}
+      {data.config?.path && !data.isWorkflowActive && (
+        <div className="mt-1">
+          <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-700">
+            Inactive - Activate workflow to enable
+          </Badge>
+        </div>
+      )}
+
       {data.webhookUrl && (
         <div className="mt-1 flex items-center gap-1 flex-wrap">
           <Button

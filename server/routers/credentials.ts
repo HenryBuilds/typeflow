@@ -228,10 +228,8 @@ export const credentialsRouter = router({
     .mutation(async ({ ctx, input }) => {
       // Test the connection without saving
       try {
-        const { createClient } = await import("../services/credential-service");
-        
-        // This would need to be implemented in credential-service
-        // For now, return success
+        // Connection test placeholder - returns success for now
+        // A full implementation would test the actual database/service connection
         return { success: true, message: "Connection test successful" };
       } catch (error) {
         return {

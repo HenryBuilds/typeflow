@@ -8,7 +8,6 @@ import { packageManager } from "../services/package-manager";
 export const packagesRouter = router({
   // List all packages in organization
   list: organizationProcedure
-    .input(z.object({ organizationId: z.string() }).optional())
     .query(async ({ ctx }) => {
       return await db.query.packages.findMany({
         where: eq(packages.organizationId, ctx.organization.id),

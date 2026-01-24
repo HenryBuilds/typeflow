@@ -38,6 +38,7 @@ interface WorkflowEditorProps {
   workflow: {
     id: string;
     name: string;
+    isActive?: boolean; // Whether the workflow is active
     nodes: Array<{
       id: string;
       type: string;
@@ -285,8 +286,28 @@ export function WorkflowEditor({
         }
       });
 
-      const executionStatus = nodeOutputs?.[node.id]?.status;
-      const errorMessage = nodeOutputs?.[node.id]?.error;
+      // Try to find execution status by node ID first, then fallback to label matching
+      let executionStatus = nodeOutputs?.[node.id]?.status;
+      let errorMessage = nodeOutputs?.[node.id]?.error;
+
+      // If no match by ID, try matching by label
+      if (!executionStatus && nodeOutputs && Object.keys(nodeOutputs).length > 0) {
+        const nodeLabel = node.data?.label;
+        if (nodeLabel) {
+          const matchingEntry = Object.entries(nodeOutputs).find(
+            ([_, result]) => (result as any).nodeLabel === nodeLabel
+          );
+          if (matchingEntry) {
+            executionStatus = matchingEntry[1].status;
+            errorMessage = matchingEntry[1].error;
+          }
+        }
+      }
+
+      // Debug: Log node ID matching
+      if (nodeOutputs && Object.keys(nodeOutputs).length > 0) {
+        console.log(`Node "${node.data?.label}" (${node.id}): executionStatus=${executionStatus}, nodeOutputs keys=`, Object.keys(nodeOutputs));
+      }
 
       if (node.type === "code") {
         return {
@@ -307,6 +328,11 @@ export function WorkflowEditor({
         };
       }
       if (node.type === "webhook") {
+        // Only show webhook URL when workflow is active and path is configured
+        const webhookUrl = workflow.isActive && node.data.config?.path
+          ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/${organizationId}/${node.data.config.path}`
+          : undefined;
+
         return {
           ...node,
           data: {
@@ -323,9 +349,8 @@ export function WorkflowEditor({
             isExecuting: executingNodeId === node.id,
             executionStatus,
             errorMessage,
-            webhookUrl: node.data.config?.path
-              ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/${workflow.id}/${node.data.config.path}`
-              : undefined,
+            webhookUrl,
+            isWorkflowActive: workflow.isActive,
           },
         };
       }
@@ -377,7 +402,7 @@ export function WorkflowEditor({
         },
       };
     });
-  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode]);
+  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit]);
 
   const handleCodeSave = useCallback(
     (data: { code: string; label: string }) => {
@@ -540,11 +565,11 @@ export function WorkflowEditor({
         // Get the latest node data with inputData from nodesWithHandlers
         const latestNode = nodesWithHandlers.find(n => n.id === editingNodeId);
         const nodeInputData = latestNode?.data?.inputData || editingNode.data.inputData;
-        
+
         // Build map of source node IDs to labels
         const sourceNodeLabels: Record<string, string> = {};
-        if (nodeInputData) {
-          nodeInputData.forEach((input) => {
+        if (nodeInputData && Array.isArray(nodeInputData)) {
+          nodeInputData.forEach((input: { sourceNodeId?: string; output?: unknown; distance?: number; sourceNodeLabel?: string }) => {
             if (input.sourceNodeId && !sourceNodeLabels[input.sourceNodeId]) {
               const sourceNode = nodes.find(n => n.id === input.sourceNodeId);
               sourceNodeLabels[input.sourceNodeId] = sourceNode?.data?.label || `Node ${input.sourceNodeId.substring(0, 8)}`;

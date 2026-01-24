@@ -283,15 +283,16 @@ export const executionsRouter = router({
           nodeResults: result.nodeResults,
           finalOutput: result.finalOutput,
         });
-        
+
+        const now = new Date();
         const [updated] = await db
           .update(executions)
           .set({
             status: result.success ? "completed" : "failed",
             result: result.finalOutput,
             nodeResults: result.nodeResults,
-            completedAt: new Date(),
-            duration: Date.now() - execution.startedAt.getTime(),
+            completedAt: now,
+            duration: execution.startedAt ? now.getTime() - execution.startedAt.getTime() : 0,
             error: result.error,
           })
           .where(eq(executions.id, execution.id))
@@ -304,15 +305,16 @@ export const executionsRouter = router({
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        
+
         // Update execution with error
+        const errorNow = new Date();
         const [updated] = await db
           .update(executions)
           .set({
             status: "failed",
             error: errorMessage,
-            completedAt: new Date(),
-            duration: Date.now() - execution.startedAt.getTime(),
+            completedAt: errorNow,
+            duration: execution.startedAt ? errorNow.getTime() - execution.startedAt.getTime() : 0,
           })
           .where(eq(executions.id, execution.id))
           .returning();
@@ -354,14 +356,15 @@ export const executionsRouter = router({
         );
 
         // Update execution with results
+        const now = new Date();
         const [updated] = await db
           .update(executions)
           .set({
             status: result.success ? "completed" : "failed",
             result: result.finalOutput,
             nodeResults: result.nodeResults,
-            completedAt: new Date(),
-            duration: Date.now() - execution.startedAt.getTime(),
+            completedAt: now,
+            duration: execution.startedAt ? now.getTime() - execution.startedAt.getTime() : 0,
             error: result.error,
           })
           .where(eq(executions.id, execution.id))
@@ -374,15 +377,16 @@ export const executionsRouter = router({
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        
+
         // Update execution with error
+        const errorNow = new Date();
         const [updated] = await db
           .update(executions)
           .set({
             status: "failed",
             error: errorMessage,
-            completedAt: new Date(),
-            duration: Date.now() - execution.startedAt.getTime(),
+            completedAt: errorNow,
+            duration: execution.startedAt ? errorNow.getTime() - execution.startedAt.getTime() : 0,
           })
           .where(eq(executions.id, execution.id))
           .returning();

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/db";
-import { webhooks, workflows, webhookRequests } from "@/db/schema";
+import { webhooks, workflows, webhookRequests, executions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { WorkflowExecutor } from "@/server/services/workflow-executor";
 
@@ -56,12 +56,13 @@ async function handleWebhookRequest(
 
     console.log(`Webhook request received: ${method} ${organizationId}/${path}`);
 
-    // Find webhook by organization and path
+    console.log(`Searching for webhook: OrgID=${organizationId}, Path=${path}`);
+
+    // Find webhook by organization and path (first without isActive check to provide better error messages)
     const webhook = await db.query.webhooks.findFirst({
       where: and(
         eq(webhooks.organizationId, organizationId),
-        eq(webhooks.path, path),
-        eq(webhooks.isActive, true)
+        eq(webhooks.path, path)
       ),
       with: {
         workflow: true,
@@ -71,10 +72,30 @@ async function handleWebhookRequest(
     if (!webhook) {
       console.error(`Webhook not found: ${organizationId}/${path}`);
       return NextResponse.json(
-        { error: "Webhook not found or inactive" },
+        { error: "Webhook not found" },
         { status: 404 }
       );
     }
+
+    // Check if webhook is active
+    if (!webhook.isActive) {
+      console.error(`Webhook inactive: ${organizationId}/${path}`);
+      return NextResponse.json(
+        { error: "Webhook is inactive. Please activate the workflow to enable this webhook." },
+        { status: 403 }
+      );
+    }
+
+    // Check if the associated workflow is active
+    if (!webhook.workflow?.isActive) {
+      console.error(`Workflow inactive for webhook: ${organizationId}/${path}`);
+      return NextResponse.json(
+        { error: "Workflow is inactive. Please activate the workflow to enable this webhook." },
+        { status: 403 }
+      );
+    }
+
+
 
     // Check if method matches (if specified in webhook config)
     if (webhook.method && webhook.method !== method) {
@@ -224,6 +245,20 @@ async function handleWebhookRequest(
 
     // Execute workflow
     const executor = new WorkflowExecutor();
+
+    // Create execution record BEFORE executing
+    const [execution] = await db
+      .insert(executions)
+      .values({
+        organizationId,
+        workflowId: webhook.workflowId,
+        triggerType: "webhook",
+        triggerData,
+        status: "running",
+        startedAt: new Date(),
+      })
+      .returning();
+
     const result = await executor.executeWorkflow(
       webhook.workflowId,
       organizationId,
@@ -236,6 +271,20 @@ async function handleWebhookRequest(
     const hasFailed = Object.values(result.nodeResults || {}).some(
       (node) => node.status === "failed"
     );
+
+    // Update execution record with results
+    const now = new Date();
+    await db
+      .update(executions)
+      .set({
+        status: hasFailed ? "failed" : "completed",
+        nodeResults: result.nodeResults,
+        result: result.finalOutput,
+        error: result.error,
+        completedAt: now,
+        duration: execution.startedAt ? now.getTime() - execution.startedAt.getTime() : 0,
+      })
+      .where(eq(executions.id, execution.id));
 
     if (hasFailed) {
       const failedNode = Object.values(result.nodeResults || {}).find(
@@ -251,15 +300,15 @@ async function handleWebhookRequest(
     }
 
     // Get the final output
-    let responseData = result.finalOutput?.[0]?.json || { 
+    let responseData: unknown = result.finalOutput?.[0]?.json || {
       success: true,
       message: "Workflow executed successfully",
       executionId: result.nodeResults ? Object.keys(result.nodeResults)[0] : undefined
     };
-    
+
     // If the output has a single 'value' property, unwrap it (this happens when returning primitives)
-    if (responseData && typeof responseData === 'object' && Object.keys(responseData).length === 1 && 'value' in responseData) {
-      responseData = responseData.value;
+    if (responseData && typeof responseData === 'object' && responseData !== null && Object.keys(responseData).length === 1 && 'value' in responseData) {
+      responseData = (responseData as { value: unknown }).value;
     }
 
     return NextResponse.json(responseData, { status: 200 });
