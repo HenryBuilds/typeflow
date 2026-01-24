@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench, Power, Copy, Check, History } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench, Power, Copy, Check, History, GitBranch, Upload } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -13,6 +13,9 @@ import { TypeDefinitionsDialog } from "@/components/type-definitions-dialog";
 import { PackagesDialog } from "@/components/packages-dialog";
 import { WebhookDialog } from "@/components/webhook-dialog";
 import { ExecutionsPanel } from "@/components/executions-panel";
+import { ExecuteWorkflowDialog } from "@/components/execute-workflow-dialog";
+import { WorkflowInputDialog } from "@/components/workflow-input-dialog";
+import { WorkflowOutputDialog } from "@/components/workflow-output-dialog";
 import { useSaveWorkflow } from "@/hooks/use-workflows";
 import { Node, Edge } from "reactflow";
 
@@ -49,6 +52,12 @@ export default function WorkflowEditorPage() {
   const [packagesDialogOpen, setPackagesDialogOpen] = useState(false);
   const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
   const [editingWebhookNode, setEditingWebhookNode] = useState<Node | null>(null);
+  const [executeWorkflowDialogOpen, setExecuteWorkflowDialogOpen] = useState(false);
+  const [editingExecuteWorkflowNode, setEditingExecuteWorkflowNode] = useState<Node | null>(null);
+  const [workflowInputDialogOpen, setWorkflowInputDialogOpen] = useState(false);
+  const [editingWorkflowInputNode, setEditingWorkflowInputNode] = useState<Node | null>(null);
+  const [workflowOutputDialogOpen, setWorkflowOutputDialogOpen] = useState(false);
+  const [editingWorkflowOutputNode, setEditingWorkflowOutputNode] = useState<Node | null>(null);
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [workflowLogs, setWorkflowLogs] = useState<WorkflowLog[]>([]);
   const [logPanelCollapsed, setLogPanelCollapsed] = useState(false); // Start expanded by default so it's visible
@@ -884,7 +893,25 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
-                  
+
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "executeWorkflow");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
+                        <GitBranch className="h-4 w-4 text-secondary-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Execute Workflow</span>
+                        <p className="text-xs text-muted-foreground truncate">Run subworkflow</p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -928,7 +955,48 @@ export default function WorkflowEditorPage() {
                   </div>
                 </div>
               </div>
-              
+
+              {/* Subworkflow Section */}
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Subworkflow</h4>
+                <div className="space-y-1.5">
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "workflowInput");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
+                        <Download className="h-4 w-4 text-secondary-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Workflow Input</span>
+                        <p className="text-xs text-muted-foreground truncate">Receives data</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "workflowOutput");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
+                        <Upload className="h-4 w-4 text-secondary-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Workflow Output</span>
+                        <p className="text-xs text-muted-foreground truncate">Returns data</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Other Section */}
               <div className="mb-4">
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Other</h4>
@@ -994,6 +1062,18 @@ export default function WorkflowEditorPage() {
                 onWebhookEdit={(nodeId, node) => {
                   setEditingWebhookNode(node);
                   setWebhookDialogOpen(true);
+                }}
+                onExecuteWorkflowEdit={(nodeId, node) => {
+                  setEditingExecuteWorkflowNode(node);
+                  setExecuteWorkflowDialogOpen(true);
+                }}
+                onWorkflowInputEdit={(nodeId, node) => {
+                  setEditingWorkflowInputNode(node);
+                  setWorkflowInputDialogOpen(true);
+                }}
+                onWorkflowOutputEdit={(nodeId, node) => {
+                  setEditingWorkflowOutputNode(node);
+                  setWorkflowOutputDialogOpen(true);
                 }}
               />
             </div>
@@ -1280,6 +1360,226 @@ export default function WorkflowEditorPage() {
                 onError: (error) => {
                   console.error("Error saving webhook node:", error);
                   alert(`Error saving webhook: ${error.message}`);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Execute Workflow Dialog */}
+      {editingExecuteWorkflowNode && (
+        <ExecuteWorkflowDialog
+          open={executeWorkflowDialogOpen}
+          onOpenChange={(open) => {
+            setExecuteWorkflowDialogOpen(open);
+            if (!open) {
+              setEditingExecuteWorkflowNode(null);
+            }
+          }}
+          organizationId={organizationId}
+          currentWorkflowId={workflowId}
+          initialConfig={editingExecuteWorkflowNode.data?.config as { workflowId?: string; workflowName?: string; mode?: "once" | "foreach" } | undefined}
+          initialLabel={editingExecuteWorkflowNode.data?.label || "Execute Workflow"}
+          onSave={(data) => {
+            // Update the node in the editor via ref
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) => {
+              if (node.id === editingExecuteWorkflowNode.id) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    label: data.label,
+                    config: data.config,
+                  },
+                };
+              }
+              return node;
+            });
+
+            // Save with updated nodes
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId: organizationId,
+                workflowId: workflow.id,
+                workflow: {
+                  name: workflow.name,
+                  description: workflow.description || undefined,
+                  version: workflow.version,
+                  metadata: workflow.metadata || undefined,
+                },
+                nodes: updatedNodes.map((node) => ({
+                  id: node.id,
+                  type: node.type || "workflow",
+                  label: node.data.label || "Node",
+                  position: node.position,
+                  config: node.data.config || {},
+                  executionOrder: 0,
+                })),
+                connections: currentEdges.map((edge) => ({
+                  id: edge.id || undefined,
+                  sourceNodeId: edge.source,
+                  targetNodeId: edge.target,
+                  sourceHandle: edge.sourceHandle || undefined,
+                  targetHandle: edge.targetHandle || undefined,
+                })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  await utils.workflows.getById.refetch({ organizationId, id: workflowId });
+                  setExecuteWorkflowDialogOpen(false);
+                  setEditingExecuteWorkflowNode(null);
+                },
+                onError: (error) => {
+                  console.error("Error saving execute workflow node:", error);
+                  alert(`Error saving: ${error.message}`);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Workflow Input Dialog */}
+      {editingWorkflowInputNode && (
+        <WorkflowInputDialog
+          open={workflowInputDialogOpen}
+          onOpenChange={(open) => {
+            setWorkflowInputDialogOpen(open);
+            if (!open) {
+              setEditingWorkflowInputNode(null);
+            }
+          }}
+          initialConfig={editingWorkflowInputNode.data?.config as { fields?: Array<{ name: string; type: string; description?: string }> } | undefined}
+          initialLabel={editingWorkflowInputNode.data?.label || "Workflow Input"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) => {
+              if (node.id === editingWorkflowInputNode.id) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    label: data.label,
+                    config: data.config,
+                  },
+                };
+              }
+              return node;
+            });
+
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId: organizationId,
+                workflowId: workflow.id,
+                workflow: {
+                  name: workflow.name,
+                  description: workflow.description || undefined,
+                  version: workflow.version,
+                  metadata: workflow.metadata || undefined,
+                },
+                nodes: updatedNodes.map((node) => ({
+                  id: node.id,
+                  type: node.type || "workflow",
+                  label: node.data.label || "Node",
+                  position: node.position,
+                  config: node.data.config || {},
+                  executionOrder: 0,
+                })),
+                connections: currentEdges.map((edge) => ({
+                  id: edge.id || undefined,
+                  sourceNodeId: edge.source,
+                  targetNodeId: edge.target,
+                  sourceHandle: edge.sourceHandle || undefined,
+                  targetHandle: edge.targetHandle || undefined,
+                })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  await utils.workflows.getById.refetch({ organizationId, id: workflowId });
+                  setWorkflowInputDialogOpen(false);
+                  setEditingWorkflowInputNode(null);
+                },
+                onError: (error) => {
+                  console.error("Error saving workflow input node:", error);
+                  alert(`Error saving: ${error.message}`);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Workflow Output Dialog */}
+      {editingWorkflowOutputNode && (
+        <WorkflowOutputDialog
+          open={workflowOutputDialogOpen}
+          onOpenChange={(open) => {
+            setWorkflowOutputDialogOpen(open);
+            if (!open) {
+              setEditingWorkflowOutputNode(null);
+            }
+          }}
+          initialConfig={editingWorkflowOutputNode.data?.config as { fields?: Array<{ name: string; type: string; description?: string }> } | undefined}
+          initialLabel={editingWorkflowOutputNode.data?.label || "Workflow Output"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) => {
+              if (node.id === editingWorkflowOutputNode.id) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    label: data.label,
+                    config: data.config,
+                  },
+                };
+              }
+              return node;
+            });
+
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId: organizationId,
+                workflowId: workflow.id,
+                workflow: {
+                  name: workflow.name,
+                  description: workflow.description || undefined,
+                  version: workflow.version,
+                  metadata: workflow.metadata || undefined,
+                },
+                nodes: updatedNodes.map((node) => ({
+                  id: node.id,
+                  type: node.type || "workflow",
+                  label: node.data.label || "Node",
+                  position: node.position,
+                  config: node.data.config || {},
+                  executionOrder: 0,
+                })),
+                connections: currentEdges.map((edge) => ({
+                  id: edge.id || undefined,
+                  sourceNodeId: edge.source,
+                  targetNodeId: edge.target,
+                  sourceHandle: edge.sourceHandle || undefined,
+                  targetHandle: edge.targetHandle || undefined,
+                })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  await utils.workflows.getById.refetch({ organizationId, id: workflowId });
+                  setWorkflowOutputDialogOpen(false);
+                  setEditingWorkflowOutputNode(null);
+                },
+                onError: (error) => {
+                  console.error("Error saving workflow output node:", error);
+                  alert(`Error saving: ${error.message}`);
                 },
               }
             );

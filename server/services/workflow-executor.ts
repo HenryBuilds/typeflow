@@ -469,6 +469,10 @@ export class WorkflowExecutor {
         } else if (currentNode.type === "utilities") {
           // Utilities nodes are pre-executed, skip them in the main loop
           continue;
+        } else if (currentNode.type === "executeWorkflow") {
+          // Execute a subworkflow
+          outputItems = await this.executeSubworkflow(currentNode, inputItems, organizationId);
+          console.log(`Execute Workflow node ${currentNodeId} returned ${outputItems.length} items`);
         } else {
           // Generic node - just pass through
           outputItems = inputItems;
@@ -1013,6 +1017,91 @@ ${utilitiesDeclarations}
     } catch (error) {
       throw new Error(
         `Code execution failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
+
+  private async executeSubworkflow(
+    node: typeof nodes.$inferSelect,
+    inputItems: ExecutionItem[],
+    organizationId: string
+  ): Promise<ExecutionItem[]> {
+    const config = node.config as {
+      workflowId?: string;
+      workflowName?: string;
+      mode?: "once" | "foreach";
+    };
+
+    if (!config?.workflowId) {
+      throw new Error("No workflow configured for Execute Workflow node");
+    }
+
+    const subworkflowId = config.workflowId;
+    const mode = config.mode || "once";
+
+    console.log(`Executing subworkflow ${subworkflowId} in mode: ${mode}`);
+
+    try {
+      if (mode === "once") {
+        // Execute the subworkflow once with all input items
+        const triggerData = {
+          items: inputItems,
+          json: inputItems.length > 0 ? inputItems[0].json : {},
+        };
+
+        const result = await this.executeWorkflow(
+          subworkflowId,
+          organizationId,
+          triggerData
+        );
+
+        if (!result.success) {
+          throw new Error(`Subworkflow failed: ${result.error || "Unknown error"}`);
+        }
+
+        // Return the final output from the subworkflow
+        return result.finalOutput || [{ json: { success: true } }];
+      } else {
+        // Execute the subworkflow for each input item
+        const allOutputs: ExecutionItem[] = [];
+
+        for (let i = 0; i < inputItems.length; i++) {
+          const item = inputItems[i];
+          const triggerData = {
+            item: item.json,
+            index: i,
+            json: item.json,
+          };
+
+          console.log(`Executing subworkflow for item ${i + 1}/${inputItems.length}`);
+
+          const result = await this.executeWorkflow(
+            subworkflowId,
+            organizationId,
+            triggerData
+          );
+
+          if (!result.success) {
+            throw new Error(
+              `Subworkflow failed for item ${i + 1}: ${result.error || "Unknown error"}`
+            );
+          }
+
+          // Collect outputs from each execution
+          if (result.finalOutput) {
+            allOutputs.push(...result.finalOutput);
+          } else {
+            allOutputs.push({ json: { success: true, itemIndex: i } });
+          }
+        }
+
+        return allOutputs;
+      }
+    } catch (error) {
+      throw new Error(
+        `Subworkflow execution failed: ${
           error instanceof Error ? error.message : String(error)
         }`
       );

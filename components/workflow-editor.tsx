@@ -22,7 +22,11 @@ import { WorkflowNode } from "./nodes/workflow-node";
 import { WebhookNode } from "./nodes/webhook-node";
 import { WebhookResponseNode } from "./nodes/webhook-response-node";
 import { UtilitiesNode } from "./nodes/utilities-node";
+import { ExecuteWorkflowNode } from "./nodes/execute-workflow-node";
+import { WorkflowInputNode } from "./nodes/workflow-input-node";
+import { WorkflowOutputNode } from "./nodes/workflow-output-node";
 import { CodeEditorDialog } from "./code-editor-dialog";
+import { DeletableEdge } from "./deletable-edge";
 
 const nodeTypes: NodeTypes = {
   code: CodeNode,
@@ -31,6 +35,13 @@ const nodeTypes: NodeTypes = {
   webhook: WebhookNode,
   webhookResponse: WebhookResponseNode,
   utilities: UtilitiesNode,
+  executeWorkflow: ExecuteWorkflowNode,
+  workflowInput: WorkflowInputNode,
+  workflowOutput: WorkflowOutputNode,
+};
+
+const edgeTypes = {
+  deletable: DeletableEdge,
 };
 
 interface WorkflowEditorProps {
@@ -81,13 +92,16 @@ interface WorkflowEditorProps {
     }
   >;
   onWebhookEdit?: (nodeId: string, node: Node) => void; // Callback for webhook node edit
+  onExecuteWorkflowEdit?: (nodeId: string, node: Node) => void; // Callback for execute workflow node edit
+  onWorkflowInputEdit?: (nodeId: string, node: Node) => void; // Callback for workflow input node edit
+  onWorkflowOutputEdit?: (nodeId: string, node: Node) => void; // Callback for workflow output node edit
 }
 
-export function WorkflowEditor({ 
+export function WorkflowEditor({
   organizationId,
-  workflow, 
-  onSave, 
-  getNodesRef, 
+  workflow,
+  onSave,
+  getNodesRef,
   getEdgesRef,
   selectedNodeId,
   onNodeSelect,
@@ -98,6 +112,9 @@ export function WorkflowEditor({
   installedPackages = [],
   nodeOutputs,
   onWebhookEdit,
+  onExecuteWorkflowEdit,
+  onWorkflowInputEdit,
+  onWorkflowOutputEdit,
 }: WorkflowEditorProps) {
   // Debug logging
   useEffect(() => {
@@ -133,6 +150,7 @@ export function WorkflowEditor({
         target: conn.targetNodeId,
         sourceHandle: conn.sourceHandle || undefined,
         targetHandle: conn.targetHandle || undefined,
+        type: "deletable",
       })),
     [workflow.connections]
   );
@@ -389,6 +407,61 @@ export function WorkflowEditor({
           },
         };
       }
+      if (node.type === "executeWorkflow") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onExecuteWorkflowEdit) {
+                onExecuteWorkflowEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "workflowInput") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onWorkflowInputEdit) {
+                onWorkflowInputEdit(nodeId, node);
+              }
+            },
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+          },
+        };
+      }
+      if (node.type === "workflowOutput") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onWorkflowOutputEdit) {
+                onWorkflowOutputEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
       return {
         ...node,
         data: {
@@ -402,7 +475,7 @@ export function WorkflowEditor({
         },
       };
     });
-  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit]);
+  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit]);
 
   const handleCodeSave = useCallback(
     (data: { code: string; label: string }) => {
@@ -489,7 +562,7 @@ export function WorkflowEditor({
         y: event.clientY,
       });
 
-      const baseLabel = type === "trigger" ? "Trigger" : type === "code" ? "Code Node" : type === "webhook" ? "Webhook" : type === "webhookResponse" ? "Webhook Response" : type === "utilities" ? "Utilities" : "Node";
+      const baseLabel = type === "trigger" ? "Trigger" : type === "code" ? "Code Node" : type === "webhook" ? "Webhook" : type === "webhookResponse" ? "Webhook Response" : type === "utilities" ? "Utilities" : type === "executeWorkflow" ? "Execute Workflow" : type === "workflowInput" ? "Workflow Input" : type === "workflowOutput" ? "Workflow Output" : "Node";
       const uniqueLabel = generateUniqueLabel(baseLabel, nodes);
 
       // Generate a proper UUID for the node
@@ -538,12 +611,16 @@ export function WorkflowEditor({
           onInit={setReactFlowInstance}
           onDrop={onDrop}
           onDragOver={onDragOver}
+          deleteKeyCode={["Backspace", "Delete"]}
+          edgesUpdatable={true}
+          edgesFocusable={true}
           onNodeClick={(_, node) => {
             if (onNodeSelect) {
               onNodeSelect(selectedNodeId === node.id ? null : node.id);
             }
           }}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           className="bg-background"
         >
