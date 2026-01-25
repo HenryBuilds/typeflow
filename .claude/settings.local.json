@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install @radix-ui/react-popover)",
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(git commit:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npx shadcn-ui@latest add:*)",
+      "Bash(git reset:*)"
+    ]
+  }
+}

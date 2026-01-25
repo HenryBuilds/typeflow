@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,11 +11,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, Plus, Trash2 } from "lucide-react";
+import { Upload, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface FieldDefinition {
   name: string;
   type: string;
+  value?: string; // Expression like $json.fieldName or static value
   description?: string;
 }
 
@@ -26,6 +32,13 @@ interface WorkflowOutputDialogProps {
     fields?: FieldDefinition[];
   };
   initialLabel?: string;
+  inputData?: Array<{
+    sourceNodeId: string;
+    output: unknown;
+    distance?: number;
+    sourceNodeLabel?: string;
+  }>;
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: {
     label: string;
     config: {
@@ -39,10 +52,13 @@ export function WorkflowOutputDialog({
   onOpenChange,
   initialConfig,
   initialLabel = "Workflow Output",
+  inputData,
+  sourceNodeLabels,
   onSave,
 }: WorkflowOutputDialogProps) {
   const [label, setLabel] = useState(initialLabel);
   const [fields, setFields] = useState<FieldDefinition[]>(initialConfig?.fields || []);
+  const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -51,8 +67,59 @@ export function WorkflowOutputDialog({
     }
   }, [open, initialLabel, initialConfig]);
 
+  // Build available variables from input data
+  const availableVariables = useMemo(() => {
+    if (!inputData || inputData.length === 0) return [];
+
+    const variables: Array<{ path: string; value: unknown; type: string; sourceLabel: string }> = [];
+
+    inputData.forEach((input) => {
+      const sourceLabel = input.sourceNodeLabel || sourceNodeLabels?.[input.sourceNodeId] || `Node`;
+      const output = input.output;
+
+      const extractPaths = (obj: unknown, prefix: string, depth = 0): void => {
+        if (depth > 3) return;
+
+        if (Array.isArray(obj)) {
+          if (obj.length > 0 && obj[0]?.json !== undefined) {
+            // Items array format
+            const firstItem = obj[0].json;
+            if (typeof firstItem === 'object' && firstItem !== null) {
+              Object.keys(firstItem).forEach(key => {
+                const value = (firstItem as Record<string, unknown>)[key];
+                const path = `${prefix}.${key}`;
+                variables.push({ path, value, type: typeof value, sourceLabel });
+                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                  extractPaths(value, path, depth + 1);
+                }
+              });
+            }
+          }
+        } else if (typeof obj === 'object' && obj !== null) {
+          Object.keys(obj).forEach(key => {
+            const value = (obj as Record<string, unknown>)[key];
+            const path = `${prefix}.${key}`;
+            variables.push({ path, value, type: typeof value, sourceLabel });
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+              extractPaths(value, path, depth + 1);
+            }
+          });
+        }
+      };
+
+      // Handle items array format
+      if (Array.isArray(output) && output.length > 0 && output[0]?.json !== undefined) {
+        extractPaths(output, "$json");
+      } else if (typeof output === 'object' && output !== null) {
+        extractPaths(output, "$json");
+      }
+    });
+
+    return variables;
+  }, [inputData, sourceNodeLabels]);
+
   const addField = () => {
-    setFields([...fields, { name: "", type: "any", description: "" }]);
+    setFields([...fields, { name: "", type: "any", value: "", description: "" }]);
   };
 
   const updateField = (index: number, updates: Partial<FieldDefinition>) => {
@@ -121,46 +188,95 @@ export function WorkflowOutputDialog({
                 No fields defined. The workflow will return all data from the last node.
               </div>
             ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
                 {fields.map((field, index) => (
-                  <div key={index} className="flex gap-2 items-start p-2 border rounded-md bg-muted/30">
-                    <div className="flex-1 space-y-2">
+                  <div key={index} className="p-3 border rounded-md bg-muted/30 space-y-3">
+                    <div className="flex gap-2 items-start">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Field name"
+                            value={field.name}
+                            onChange={(e) => updateField(index, { name: e.target.value })}
+                            className="flex-1"
+                          />
+                          <select
+                            value={field.type}
+                            onChange={(e) => updateField(index, { type: e.target.value })}
+                            className="px-2 py-1 border rounded-md bg-background text-sm"
+                          >
+                            <option value="any">any</option>
+                            <option value="string">string</option>
+                            <option value="number">number</option>
+                            <option value="boolean">boolean</option>
+                            <option value="object">object</option>
+                            <option value="array">array</option>
+                          </select>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeField(index)}
+                        className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+
+                    {/* Value picker */}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Value</Label>
                       <div className="flex gap-2">
                         <Input
-                          placeholder="Field name"
-                          value={field.name}
-                          onChange={(e) => updateField(index, { name: e.target.value })}
-                          className="flex-1"
+                          placeholder="e.g. $json.fieldName or static value"
+                          value={field.value || ""}
+                          onChange={(e) => updateField(index, { value: e.target.value })}
+                          className="flex-1 font-mono text-sm"
                         />
-                        <select
-                          value={field.type}
-                          onChange={(e) => updateField(index, { type: e.target.value })}
-                          className="px-2 py-1 border rounded-md bg-background text-sm"
-                        >
-                          <option value="any">any</option>
-                          <option value="string">string</option>
-                          <option value="number">number</option>
-                          <option value="boolean">boolean</option>
-                          <option value="object">object</option>
-                          <option value="array">array</option>
-                        </select>
+                        {availableVariables.length > 0 && (
+                          <Popover
+                            open={openPopoverIndex === index}
+                            onOpenChange={(isOpen) => setOpenPopoverIndex(isOpen ? index : null)}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="px-2"
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-72 p-0" align="end">
+                              <div className="p-2 border-b bg-muted/50">
+                                <p className="text-xs font-medium">Select from previous nodes</p>
+                              </div>
+                              <div className="max-h-48 overflow-y-auto">
+                                {availableVariables.map((variable, varIndex) => (
+                                  <button
+                                    key={varIndex}
+                                    type="button"
+                                    className="w-full px-3 py-2 text-left hover:bg-accent text-sm flex items-center justify-between gap-2"
+                                    onClick={() => {
+                                      updateField(index, { value: variable.path });
+                                      setOpenPopoverIndex(null);
+                                    }}
+                                  >
+                                    <code className="font-mono text-xs">{variable.path}</code>
+                                    <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+                                      {variable.type}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        )}
                       </div>
-                      <Input
-                        placeholder="Description (optional)"
-                        value={field.description || ""}
-                        onChange={(e) => updateField(index, { description: e.target.value })}
-                        className="text-xs"
-                      />
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeField(index)}
-                      className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
                   </div>
                 ))}
               </div>

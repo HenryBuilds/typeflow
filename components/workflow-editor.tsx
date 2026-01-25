@@ -25,6 +25,21 @@ import { UtilitiesNode } from "./nodes/utilities-node";
 import { ExecuteWorkflowNode } from "./nodes/execute-workflow-node";
 import { WorkflowInputNode } from "./nodes/workflow-input-node";
 import { WorkflowOutputNode } from "./nodes/workflow-output-node";
+import { FilterNode } from "./nodes/filter-node";
+import { LimitNode } from "./nodes/limit-node";
+import { RemoveDuplicatesNode } from "./nodes/remove-duplicates-node";
+import { SplitOutNode } from "./nodes/split-out-node";
+import { AggregateNode } from "./nodes/aggregate-node";
+import { MergeNode } from "./nodes/merge-node";
+import { SummarizeNode } from "./nodes/summarize-node";
+import { DateTimeNode } from "./nodes/datetime-node";
+import { EditFieldsNode } from "./nodes/edit-fields-node";
+import { HttpRequestNode } from "./nodes/http-request-node";
+import { WaitNode } from "./nodes/wait-node";
+import { NoopNode } from "./nodes/noop-node";
+import { ScheduleTriggerNode } from "./nodes/schedule-trigger-node";
+import { ManualTriggerNode } from "./nodes/manual-trigger-node";
+import { ChatTriggerNode } from "./nodes/chat-trigger-node";
 import { CodeEditorDialog } from "./code-editor-dialog";
 import { DeletableEdge } from "./deletable-edge";
 
@@ -38,6 +53,21 @@ const nodeTypes: NodeTypes = {
   executeWorkflow: ExecuteWorkflowNode,
   workflowInput: WorkflowInputNode,
   workflowOutput: WorkflowOutputNode,
+  filter: FilterNode,
+  limit: LimitNode,
+  removeDuplicates: RemoveDuplicatesNode,
+  splitOut: SplitOutNode,
+  aggregate: AggregateNode,
+  merge: MergeNode,
+  summarize: SummarizeNode,
+  dateTime: DateTimeNode,
+  editFields: EditFieldsNode,
+  httpRequest: HttpRequestNode,
+  wait: WaitNode,
+  noop: NoopNode,
+  scheduleTrigger: ScheduleTriggerNode,
+  manualTrigger: ManualTriggerNode,
+  chatTrigger: ChatTriggerNode,
 };
 
 const edgeTypes = {
@@ -95,6 +125,20 @@ interface WorkflowEditorProps {
   onExecuteWorkflowEdit?: (nodeId: string, node: Node) => void; // Callback for execute workflow node edit
   onWorkflowInputEdit?: (nodeId: string, node: Node) => void; // Callback for workflow input node edit
   onWorkflowOutputEdit?: (nodeId: string, node: Node) => void; // Callback for workflow output node edit
+  // Callbacks for data transformation nodes
+  onFilterEdit?: (nodeId: string, node: Node) => void;
+  onLimitEdit?: (nodeId: string, node: Node) => void;
+  onHttpRequestEdit?: (nodeId: string, node: Node) => void;
+  onEditFieldsEdit?: (nodeId: string, node: Node) => void;
+  onWaitEdit?: (nodeId: string, node: Node) => void;
+  onDateTimeEdit?: (nodeId: string, node: Node) => void;
+  onAggregateEdit?: (nodeId: string, node: Node) => void;
+  onMergeEdit?: (nodeId: string, node: Node) => void;
+  onSplitOutEdit?: (nodeId: string, node: Node) => void;
+  onRemoveDuplicatesEdit?: (nodeId: string, node: Node) => void;
+  onSummarizeEdit?: (nodeId: string, node: Node) => void;
+  onScheduleTriggerEdit?: (nodeId: string, node: Node) => void;
+  onChatTriggerEdit?: (nodeId: string, node: Node) => void;
 }
 
 export function WorkflowEditor({
@@ -115,6 +159,19 @@ export function WorkflowEditor({
   onExecuteWorkflowEdit,
   onWorkflowInputEdit,
   onWorkflowOutputEdit,
+  onFilterEdit,
+  onLimitEdit,
+  onHttpRequestEdit,
+  onEditFieldsEdit,
+  onWaitEdit,
+  onDateTimeEdit,
+  onAggregateEdit,
+  onMergeEdit,
+  onSplitOutEdit,
+  onRemoveDuplicatesEdit,
+  onSummarizeEdit,
+  onScheduleTriggerEdit,
+  onChatTriggerEdit,
 }: WorkflowEditorProps) {
   // Debug logging
   useEffect(() => {
@@ -462,6 +519,250 @@ export function WorkflowEditor({
           },
         };
       }
+      // Data transformation nodes
+      if (node.type === "filter") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onFilterEdit) {
+                onFilterEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "limit") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onLimitEdit) {
+                onLimitEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "httpRequest") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onHttpRequestEdit) {
+                onHttpRequestEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "editFields") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onEditFieldsEdit) {
+                onEditFieldsEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "wait") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onWaitEdit) {
+                onWaitEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "dateTime") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onDateTimeEdit) {
+                onDateTimeEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "aggregate") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onAggregateEdit) {
+                onAggregateEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "merge") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onMergeEdit) {
+                onMergeEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "splitOut") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onSplitOutEdit) {
+                onSplitOutEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "removeDuplicates") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onRemoveDuplicatesEdit) {
+                onRemoveDuplicatesEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "summarize") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onSummarizeEdit) {
+                onSummarizeEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+          },
+        };
+      }
+      if (node.type === "scheduleTrigger") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onScheduleTriggerEdit) {
+                onScheduleTriggerEdit(nodeId, node);
+              }
+            },
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+          },
+        };
+      }
+      if (node.type === "chatTrigger") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onChatTriggerEdit) {
+                onChatTriggerEdit(nodeId, node);
+              }
+            },
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+          },
+        };
+      }
       return {
         ...node,
         data: {
@@ -475,7 +776,7 @@ export function WorkflowEditor({
         },
       };
     });
-  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit]);
+  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit]);
 
   const handleCodeSave = useCallback(
     (data: { code: string; label: string }) => {
@@ -562,7 +863,32 @@ export function WorkflowEditor({
         y: event.clientY,
       });
 
-      const baseLabel = type === "trigger" ? "Trigger" : type === "code" ? "Code Node" : type === "webhook" ? "Webhook" : type === "webhookResponse" ? "Webhook Response" : type === "utilities" ? "Utilities" : type === "executeWorkflow" ? "Execute Workflow" : type === "workflowInput" ? "Workflow Input" : type === "workflowOutput" ? "Workflow Output" : "Node";
+      const labelMap: Record<string, string> = {
+        trigger: "Trigger",
+        code: "Code Node",
+        webhook: "Webhook",
+        webhookResponse: "Webhook Response",
+        utilities: "Utilities",
+        executeWorkflow: "Execute Workflow",
+        workflowInput: "Workflow Input",
+        workflowOutput: "Workflow Output",
+        filter: "Filter",
+        limit: "Limit",
+        removeDuplicates: "Remove Duplicates",
+        splitOut: "Split Out",
+        aggregate: "Aggregate",
+        merge: "Merge",
+        summarize: "Summarize",
+        dateTime: "Date & Time",
+        editFields: "Edit Fields",
+        httpRequest: "HTTP Request",
+        wait: "Wait",
+        noop: "No Operation",
+        scheduleTrigger: "Schedule",
+        manualTrigger: "Manual Trigger",
+        chatTrigger: "Chat Trigger",
+      };
+      const baseLabel = labelMap[type] || "Node";
       const uniqueLabel = generateUniqueLabel(baseLabel, nodes);
 
       // Generate a proper UUID for the node

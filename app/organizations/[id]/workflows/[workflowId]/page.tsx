@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench, Power, Copy, Check, History, GitBranch, Upload } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -16,6 +16,19 @@ import { ExecutionsPanel } from "@/components/executions-panel";
 import { ExecuteWorkflowDialog } from "@/components/execute-workflow-dialog";
 import { WorkflowInputDialog } from "@/components/workflow-input-dialog";
 import { WorkflowOutputDialog } from "@/components/workflow-output-dialog";
+import {
+  FilterNodeDialog,
+  LimitNodeDialog,
+  WaitNodeDialog,
+  DateTimeNodeDialog,
+  AggregateNodeDialog,
+  MergeNodeDialog,
+  SplitOutNodeDialog,
+  RemoveDuplicatesNodeDialog,
+  SummarizeNodeDialog,
+  EditFieldsNodeDialog,
+  HttpRequestNodeDialog,
+} from "@/components/nodes/dialogs";
 import { useSaveWorkflow } from "@/hooks/use-workflows";
 import { Node, Edge } from "reactflow";
 
@@ -58,6 +71,29 @@ export default function WorkflowEditorPage() {
   const [editingWorkflowInputNode, setEditingWorkflowInputNode] = useState<Node | null>(null);
   const [workflowOutputDialogOpen, setWorkflowOutputDialogOpen] = useState(false);
   const [editingWorkflowOutputNode, setEditingWorkflowOutputNode] = useState<Node | null>(null);
+  // Data transformation node dialogs
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [editingFilterNode, setEditingFilterNode] = useState<Node | null>(null);
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [editingLimitNode, setEditingLimitNode] = useState<Node | null>(null);
+  const [waitDialogOpen, setWaitDialogOpen] = useState(false);
+  const [editingWaitNode, setEditingWaitNode] = useState<Node | null>(null);
+  const [dateTimeDialogOpen, setDateTimeDialogOpen] = useState(false);
+  const [editingDateTimeNode, setEditingDateTimeNode] = useState<Node | null>(null);
+  const [aggregateDialogOpen, setAggregateDialogOpen] = useState(false);
+  const [editingAggregateNode, setEditingAggregateNode] = useState<Node | null>(null);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [editingMergeNode, setEditingMergeNode] = useState<Node | null>(null);
+  const [splitOutDialogOpen, setSplitOutDialogOpen] = useState(false);
+  const [editingSplitOutNode, setEditingSplitOutNode] = useState<Node | null>(null);
+  const [removeDuplicatesDialogOpen, setRemoveDuplicatesDialogOpen] = useState(false);
+  const [editingRemoveDuplicatesNode, setEditingRemoveDuplicatesNode] = useState<Node | null>(null);
+  const [summarizeDialogOpen, setSummarizeDialogOpen] = useState(false);
+  const [editingSummarizeNode, setEditingSummarizeNode] = useState<Node | null>(null);
+  const [editFieldsDialogOpen, setEditFieldsDialogOpen] = useState(false);
+  const [editingEditFieldsNode, setEditingEditFieldsNode] = useState<Node | null>(null);
+  const [httpRequestDialogOpen, setHttpRequestDialogOpen] = useState(false);
+  const [editingHttpRequestNode, setEditingHttpRequestNode] = useState<Node | null>(null);
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [workflowLogs, setWorkflowLogs] = useState<WorkflowLog[]>([]);
   const [logPanelCollapsed, setLogPanelCollapsed] = useState(false); // Start expanded by default so it's visible
@@ -843,8 +879,8 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                        <Zap className="h-4 w-4 text-primary" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Zap className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Trigger</span>
@@ -860,12 +896,63 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                        <Webhook className="h-4 w-4 text-primary" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Webhook className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Webhook</span>
                         <p className="text-xs text-muted-foreground truncate">Receive requests</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "manualTrigger");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <MousePointer className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Manual Trigger</span>
+                        <p className="text-xs text-muted-foreground truncate">Click to run</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "scheduleTrigger");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Clock className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Schedule</span>
+                        <p className="text-xs text-muted-foreground truncate">Run on interval</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "chatTrigger");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <MessageSquare className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Chat Trigger</span>
+                        <p className="text-xs text-muted-foreground truncate">On chat message</p>
                       </div>
                     </div>
                   </div>
@@ -884,8 +971,8 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
-                        <Code className="h-4 w-4 text-secondary-foreground" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Code className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Code</span>
@@ -902,8 +989,8 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
-                        <GitBranch className="h-4 w-4 text-secondary-foreground" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <GitBranch className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Execute Workflow</span>
@@ -920,12 +1007,63 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
-                        <Send className="h-4 w-4 text-secondary-foreground" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Send className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Response</span>
                         <p className="text-xs text-muted-foreground truncate">Send HTTP response</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "httpRequest");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Globe className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">HTTP Request</span>
+                        <p className="text-xs text-muted-foreground truncate">Make API calls</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "wait");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Timer className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Wait</span>
+                        <p className="text-xs text-muted-foreground truncate">Pause execution</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "noop");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <ArrowRight className="h-4 w-4 text-gray-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">No Operation</span>
+                        <p className="text-xs text-muted-foreground truncate">Pass through</p>
                       </div>
                     </div>
                   </div>
@@ -944,12 +1082,186 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
-                        <Wrench className="h-4 w-4 text-secondary-foreground" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Wrench className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Utilities</span>
                         <p className="text-xs text-muted-foreground truncate">Shared functions</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Data Transformation Section */}
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Transform Data</h4>
+                <div className="space-y-1.5">
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "editFields");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <PenLine className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Edit Fields</span>
+                        <p className="text-xs text-muted-foreground truncate">Set, add, remove fields</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "dateTime");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Clock className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Date & Time</span>
+                        <p className="text-xs text-muted-foreground truncate">Manipulate dates</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter & Limit Section */}
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Filter Items</h4>
+                <div className="space-y-1.5">
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "filter");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Filter className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Filter</span>
+                        <p className="text-xs text-muted-foreground truncate">Remove by condition</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "limit");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <ArrowDown className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Limit</span>
+                        <p className="text-xs text-muted-foreground truncate">Restrict item count</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "removeDuplicates");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Copy className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Remove Duplicates</span>
+                        <p className="text-xs text-muted-foreground truncate">Unique values</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "splitOut");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <SplitSquareVertical className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Split Out</span>
+                        <p className="text-xs text-muted-foreground truncate">Array to items</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Combine Items Section */}
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Combine Items</h4>
+                <div className="space-y-1.5">
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "aggregate");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <ListPlus className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Aggregate</span>
+                        <p className="text-xs text-muted-foreground truncate">Combine into list</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "merge");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <GitMerge className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Merge</span>
+                        <p className="text-xs text-muted-foreground truncate">Merge streams</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "summarize");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Calculator className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Summarize</span>
+                        <p className="text-xs text-muted-foreground truncate">Sum, count, max...</p>
                       </div>
                     </div>
                   </div>
@@ -968,8 +1280,8 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
-                        <Download className="h-4 w-4 text-secondary-foreground" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Download className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Workflow Input</span>
@@ -985,8 +1297,8 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-secondary/30 flex items-center justify-center group-hover:bg-secondary/40 transition-colors">
-                        <Upload className="h-4 w-4 text-secondary-foreground" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Upload className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Workflow Output</span>
@@ -1074,6 +1386,50 @@ export default function WorkflowEditorPage() {
                 onWorkflowOutputEdit={(nodeId, node) => {
                   setEditingWorkflowOutputNode(node);
                   setWorkflowOutputDialogOpen(true);
+                }}
+                onFilterEdit={(nodeId, node) => {
+                  setEditingFilterNode(node);
+                  setFilterDialogOpen(true);
+                }}
+                onLimitEdit={(nodeId, node) => {
+                  setEditingLimitNode(node);
+                  setLimitDialogOpen(true);
+                }}
+                onHttpRequestEdit={(nodeId, node) => {
+                  setEditingHttpRequestNode(node);
+                  setHttpRequestDialogOpen(true);
+                }}
+                onEditFieldsEdit={(nodeId, node) => {
+                  setEditingEditFieldsNode(node);
+                  setEditFieldsDialogOpen(true);
+                }}
+                onWaitEdit={(nodeId, node) => {
+                  setEditingWaitNode(node);
+                  setWaitDialogOpen(true);
+                }}
+                onDateTimeEdit={(nodeId, node) => {
+                  setEditingDateTimeNode(node);
+                  setDateTimeDialogOpen(true);
+                }}
+                onAggregateEdit={(nodeId, node) => {
+                  setEditingAggregateNode(node);
+                  setAggregateDialogOpen(true);
+                }}
+                onMergeEdit={(nodeId, node) => {
+                  setEditingMergeNode(node);
+                  setMergeDialogOpen(true);
+                }}
+                onSplitOutEdit={(nodeId, node) => {
+                  setEditingSplitOutNode(node);
+                  setSplitOutDialogOpen(true);
+                }}
+                onRemoveDuplicatesEdit={(nodeId, node) => {
+                  setEditingRemoveDuplicatesNode(node);
+                  setRemoveDuplicatesDialogOpen(true);
+                }}
+                onSummarizeEdit={(nodeId, node) => {
+                  setEditingSummarizeNode(node);
+                  setSummarizeDialogOpen(true);
                 }}
               />
             </div>
@@ -1525,8 +1881,9 @@ export default function WorkflowEditorPage() {
               setEditingWorkflowOutputNode(null);
             }
           }}
-          initialConfig={editingWorkflowOutputNode.data?.config as { fields?: Array<{ name: string; type: string; description?: string }> } | undefined}
+          initialConfig={editingWorkflowOutputNode.data?.config as { fields?: Array<{ name: string; type: string; value?: string; description?: string }> } | undefined}
           initialLabel={editingWorkflowOutputNode.data?.label || "Workflow Output"}
+          inputData={editingWorkflowOutputNode.data?.inputData as Array<{ sourceNodeId: string; output: unknown; distance?: number; sourceNodeLabel?: string }> | undefined}
           onSave={(data) => {
             const currentNodes = getNodesRef.current?.() || [];
             const updatedNodes = currentNodes.map((node) => {
@@ -1580,6 +1937,435 @@ export default function WorkflowEditorPage() {
                 onError: (error) => {
                   console.error("Error saving workflow output node:", error);
                   alert(`Error saving: ${error.message}`);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Filter Node Dialog */}
+      {editingFilterNode && (
+        <FilterNodeDialog
+          open={filterDialogOpen}
+          onOpenChange={(open) => {
+            setFilterDialogOpen(open);
+            if (!open) setEditingFilterNode(null);
+          }}
+          nodeId={editingFilterNode.id}
+          initialConfig={editingFilterNode.data?.config as any}
+          initialLabel={editingFilterNode.data?.label || "Filter"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingFilterNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setFilterDialogOpen(false);
+                  setEditingFilterNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Limit Node Dialog */}
+      {editingLimitNode && (
+        <LimitNodeDialog
+          open={limitDialogOpen}
+          onOpenChange={(open) => {
+            setLimitDialogOpen(open);
+            if (!open) setEditingLimitNode(null);
+          }}
+          nodeId={editingLimitNode.id}
+          initialConfig={editingLimitNode.data?.config as any}
+          initialLabel={editingLimitNode.data?.label || "Limit"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingLimitNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setLimitDialogOpen(false);
+                  setEditingLimitNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Wait Node Dialog */}
+      {editingWaitNode && (
+        <WaitNodeDialog
+          open={waitDialogOpen}
+          onOpenChange={(open) => {
+            setWaitDialogOpen(open);
+            if (!open) setEditingWaitNode(null);
+          }}
+          nodeId={editingWaitNode.id}
+          initialConfig={editingWaitNode.data?.config as any}
+          initialLabel={editingWaitNode.data?.label || "Wait"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingWaitNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setWaitDialogOpen(false);
+                  setEditingWaitNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* DateTime Node Dialog */}
+      {editingDateTimeNode && (
+        <DateTimeNodeDialog
+          open={dateTimeDialogOpen}
+          onOpenChange={(open) => {
+            setDateTimeDialogOpen(open);
+            if (!open) setEditingDateTimeNode(null);
+          }}
+          nodeId={editingDateTimeNode.id}
+          initialConfig={editingDateTimeNode.data?.config as any}
+          initialLabel={editingDateTimeNode.data?.label || "DateTime"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingDateTimeNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setDateTimeDialogOpen(false);
+                  setEditingDateTimeNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Aggregate Node Dialog */}
+      {editingAggregateNode && (
+        <AggregateNodeDialog
+          open={aggregateDialogOpen}
+          onOpenChange={(open) => {
+            setAggregateDialogOpen(open);
+            if (!open) setEditingAggregateNode(null);
+          }}
+          nodeId={editingAggregateNode.id}
+          initialConfig={editingAggregateNode.data?.config as any}
+          initialLabel={editingAggregateNode.data?.label || "Aggregate"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingAggregateNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setAggregateDialogOpen(false);
+                  setEditingAggregateNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Merge Node Dialog */}
+      {editingMergeNode && (
+        <MergeNodeDialog
+          open={mergeDialogOpen}
+          onOpenChange={(open) => {
+            setMergeDialogOpen(open);
+            if (!open) setEditingMergeNode(null);
+          }}
+          nodeId={editingMergeNode.id}
+          initialConfig={editingMergeNode.data?.config as any}
+          initialLabel={editingMergeNode.data?.label || "Merge"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingMergeNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setMergeDialogOpen(false);
+                  setEditingMergeNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Split Out Node Dialog */}
+      {editingSplitOutNode && (
+        <SplitOutNodeDialog
+          open={splitOutDialogOpen}
+          onOpenChange={(open) => {
+            setSplitOutDialogOpen(open);
+            if (!open) setEditingSplitOutNode(null);
+          }}
+          nodeId={editingSplitOutNode.id}
+          initialConfig={editingSplitOutNode.data?.config as any}
+          initialLabel={editingSplitOutNode.data?.label || "Split Out"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingSplitOutNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setSplitOutDialogOpen(false);
+                  setEditingSplitOutNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Remove Duplicates Node Dialog */}
+      {editingRemoveDuplicatesNode && (
+        <RemoveDuplicatesNodeDialog
+          open={removeDuplicatesDialogOpen}
+          onOpenChange={(open) => {
+            setRemoveDuplicatesDialogOpen(open);
+            if (!open) setEditingRemoveDuplicatesNode(null);
+          }}
+          nodeId={editingRemoveDuplicatesNode.id}
+          initialConfig={editingRemoveDuplicatesNode.data?.config as any}
+          initialLabel={editingRemoveDuplicatesNode.data?.label || "Remove Duplicates"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingRemoveDuplicatesNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setRemoveDuplicatesDialogOpen(false);
+                  setEditingRemoveDuplicatesNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Summarize Node Dialog */}
+      {editingSummarizeNode && (
+        <SummarizeNodeDialog
+          open={summarizeDialogOpen}
+          onOpenChange={(open) => {
+            setSummarizeDialogOpen(open);
+            if (!open) setEditingSummarizeNode(null);
+          }}
+          nodeId={editingSummarizeNode.id}
+          initialConfig={editingSummarizeNode.data?.config as any}
+          initialLabel={editingSummarizeNode.data?.label || "Summarize"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingSummarizeNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setSummarizeDialogOpen(false);
+                  setEditingSummarizeNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Edit Fields Node Dialog */}
+      {editingEditFieldsNode && (
+        <EditFieldsNodeDialog
+          open={editFieldsDialogOpen}
+          onOpenChange={(open) => {
+            setEditFieldsDialogOpen(open);
+            if (!open) setEditingEditFieldsNode(null);
+          }}
+          nodeId={editingEditFieldsNode.id}
+          initialConfig={editingEditFieldsNode.data?.config as any}
+          initialLabel={editingEditFieldsNode.data?.label || "Edit Fields"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingEditFieldsNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setEditFieldsDialogOpen(false);
+                  setEditingEditFieldsNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* HTTP Request Node Dialog */}
+      {editingHttpRequestNode && (
+        <HttpRequestNodeDialog
+          open={httpRequestDialogOpen}
+          onOpenChange={(open) => {
+            setHttpRequestDialogOpen(open);
+            if (!open) setEditingHttpRequestNode(null);
+          }}
+          nodeId={editingHttpRequestNode.id}
+          initialConfig={editingHttpRequestNode.data?.config as any}
+          initialLabel={editingHttpRequestNode.data?.label || "HTTP Request"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingHttpRequestNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+                  setHttpRequestDialogOpen(false);
+                  setEditingHttpRequestNode(null);
                 },
               }
             );
