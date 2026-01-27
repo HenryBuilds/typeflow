@@ -14,6 +14,7 @@ export * from "./webhooks";
 export * from "./webhook-requests";
 export * from "./environments";
 export * from "./credentials";
+export * from "./debug-sessions";
 
 // Import tables for relations
 import { organizations } from "./organizations";

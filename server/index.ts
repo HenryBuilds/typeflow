@@ -7,6 +7,7 @@ import { environmentsRouter } from "./routers/environments";
 import { webhooksRouter } from "./routers/webhooks";
 import { credentialsRouter } from "./routers/credentials";
 import { authRouter } from "./routers/auth";
+import { debugRouter } from "./routers/debug";
 
 export const appRouter = router({
   auth: authRouter,
@@ -17,6 +18,7 @@ export const appRouter = router({
   environments: environmentsRouter,
   webhooks: webhooksRouter,
   credentials: credentialsRouter,
+  debug: debugRouter,
 });
 
 // Export type router type signature,

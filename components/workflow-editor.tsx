@@ -139,6 +139,11 @@ interface WorkflowEditorProps {
   onSummarizeEdit?: (nodeId: string, node: Node) => void;
   onScheduleTriggerEdit?: (nodeId: string, node: Node) => void;
   onChatTriggerEdit?: (nodeId: string, node: Node) => void;
+  // Debug mode props
+  debugMode?: boolean;
+  breakpoints?: Set<string>;
+  debugCurrentNodeId?: string | null;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export function WorkflowEditor({
@@ -172,6 +177,11 @@ export function WorkflowEditor({
   onSummarizeEdit,
   onScheduleTriggerEdit,
   onChatTriggerEdit,
+  // Debug mode props
+  debugMode = false,
+  breakpoints = new Set(),
+  debugCurrentNodeId = null,
+  onToggleBreakpoint,
 }: WorkflowEditorProps) {
   // Debug logging
   useEffect(() => {
