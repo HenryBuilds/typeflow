@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { NodeWrapper } from "./node-wrapper";
 
 interface ChatTriggerNodeData {
   label?: string;
@@ -24,6 +25,9 @@ interface ChatTriggerNodeData {
   isExecuting?: boolean;
   executionStatus?: "pending" | "running" | "completed" | "failed";
   errorMessage?: string;
+  hasBreakpoint?: boolean;
+  isBreakpointActive?: boolean;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export const ChatTriggerNode = memo(({ data, selected, id }: NodeProps<ChatTriggerNodeData>) => {
@@ -79,11 +83,12 @@ export const ChatTriggerNode = memo(({ data, selected, id }: NodeProps<ChatTrigg
   };
 
   return (
-    <div
-      className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 min-w-[180px] cursor-pointer ${getStatusStyles()}`}
-      onDoubleClick={handleDoubleClick}
-      title="Double-click to configure"
-    >
+    <NodeWrapper nodeId={id} hasBreakpoint={data.hasBreakpoint} isBreakpointActive={data.isBreakpointActive} onToggleBreakpoint={data.onToggleBreakpoint}>
+      <div
+        className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 min-w-[180px] cursor-pointer ${getStatusStyles()}`}
+        onDoubleClick={handleDoubleClick}
+        title="Double-click to configure"
+      >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-4 w-4 text-gray-600" />
@@ -175,7 +180,8 @@ export const ChatTriggerNode = memo(({ data, selected, id }: NodeProps<ChatTrigg
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </NodeWrapper>
   );
 });
 

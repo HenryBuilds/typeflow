@@ -409,6 +409,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData, // Pass input data to node
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -436,6 +440,10 @@ export function WorkflowEditor({
             errorMessage,
             webhookUrl,
             isWorkflowActive: workflow.isActive,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -454,6 +462,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -471,6 +483,10 @@ export function WorkflowEditor({
             isExecuting: executingNodeId === node.id,
             executionStatus,
             errorMessage,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -490,6 +506,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -507,6 +527,10 @@ export function WorkflowEditor({
             isExecuting: executingNodeId === node.id,
             executionStatus,
             errorMessage,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -526,6 +550,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -546,6 +574,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -565,6 +597,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -584,6 +620,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -603,6 +643,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -622,6 +666,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -641,6 +689,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -660,6 +712,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -679,6 +735,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -698,6 +758,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -717,6 +781,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -736,6 +804,10 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             inputData,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -753,6 +825,10 @@ export function WorkflowEditor({
             isExecuting: executingNodeId === node.id,
             executionStatus,
             errorMessage,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -770,6 +846,10 @@ export function WorkflowEditor({
             isExecuting: executingNodeId === node.id,
             executionStatus,
             errorMessage,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
           },
         };
       }
@@ -783,10 +863,14 @@ export function WorkflowEditor({
           executionStatus,
           errorMessage,
           inputData, // Also pass to other node types
+          // Debug props for all nodes
+          hasBreakpoint: breakpoints.has(node.id),
+          isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+          onToggleBreakpoint,
         },
       };
     });
-  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit]);
+  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit, debugMode, breakpoints, debugCurrentNodeId, onToggleBreakpoint]);
 
   const handleCodeSave = useCallback(
     (data: { code: string; label: string }) => {

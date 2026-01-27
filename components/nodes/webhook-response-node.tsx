@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { NodeWrapper } from "./node-wrapper";
 
 interface WebhookResponseNodeData {
   label?: string;
@@ -29,6 +30,9 @@ interface WebhookResponseNodeData {
     sourceNodeId: string;
     output: unknown;
   }>;
+  hasBreakpoint?: boolean;
+  isBreakpointActive?: boolean;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export const WebhookResponseNode = memo(({ data, selected, id }: NodeProps<WebhookResponseNodeData>) => {
@@ -85,11 +89,12 @@ export const WebhookResponseNode = memo(({ data, selected, id }: NodeProps<Webho
   };
 
   return (
-    <div
-      className={`px-4 py-2 shadow-md rounded-md border-2 cursor-pointer transition-all duration-200 ${getStatusStyles()}`}
-      onDoubleClick={handleDoubleClick}
-      title="Double-click to configure response"
-    >
+    <NodeWrapper nodeId={id} hasBreakpoint={data.hasBreakpoint} isBreakpointActive={data.isBreakpointActive} onToggleBreakpoint={data.onToggleBreakpoint}>
+      <div
+        className={`px-4 py-2 shadow-md rounded-md border-2 cursor-pointer transition-all duration-200 ${getStatusStyles()}`}
+        onDoubleClick={handleDoubleClick}
+        title="Double-click to configure response"
+      >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Send className="h-4 w-4 text-indigo-500" />
@@ -168,7 +173,8 @@ export const WebhookResponseNode = memo(({ data, selected, id }: NodeProps<Webho
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </NodeWrapper>
   );
 });
 

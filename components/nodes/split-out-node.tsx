@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { NodeWrapper } from "./node-wrapper";
 
 interface SplitOutNodeData {
   label?: string;
@@ -23,6 +24,9 @@ interface SplitOutNodeData {
   isExecuting?: boolean;
   executionStatus?: "pending" | "running" | "completed" | "failed";
   errorMessage?: string;
+  hasBreakpoint?: boolean;
+  isBreakpointActive?: boolean;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export const SplitOutNode = memo(({ data, selected, id }: NodeProps<SplitOutNodeData>) => {
@@ -78,11 +82,12 @@ export const SplitOutNode = memo(({ data, selected, id }: NodeProps<SplitOutNode
   };
 
   return (
-    <div
-      className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 min-w-[160px] cursor-pointer ${getStatusStyles()}`}
-      onDoubleClick={handleDoubleClick}
-      title="Double-click to configure"
-    >
+    <NodeWrapper nodeId={id} hasBreakpoint={data.hasBreakpoint} isBreakpointActive={data.isBreakpointActive} onToggleBreakpoint={data.onToggleBreakpoint}>
+      <div
+        className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 min-w-[160px] cursor-pointer ${getStatusStyles()}`}
+        onDoubleClick={handleDoubleClick}
+        title="Double-click to configure"
+      >
       <Handle
         type="target"
         position={Position.Top}
@@ -180,7 +185,8 @@ export const SplitOutNode = memo(({ data, selected, id }: NodeProps<SplitOutNode
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </NodeWrapper>
   );
 });
 

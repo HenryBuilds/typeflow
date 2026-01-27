@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { NodeWrapper } from "./node-wrapper";
 
 interface UtilitiesNodeData {
   label?: string;
@@ -23,6 +24,10 @@ interface UtilitiesNodeData {
   isExecuting?: boolean;
   executionStatus?: "pending" | "running" | "completed" | "failed";
   errorMessage?: string;
+  // Debug props
+  hasBreakpoint?: boolean;
+  isBreakpointActive?: boolean;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export const UtilitiesNode = memo(({ data, selected, id }: NodeProps<UtilitiesNodeData>) => {
@@ -79,11 +84,17 @@ export const UtilitiesNode = memo(({ data, selected, id }: NodeProps<UtilitiesNo
   };
 
   return (
-    <div
-      className={`px-4 py-2 shadow-md rounded-md border-2 cursor-pointer transition-all duration-200 ${getStatusStyles()}`}
-      onDoubleClick={handleDoubleClick}
-      title="Double-click to edit utility functions"
+    <NodeWrapper
+      nodeId={id}
+      hasBreakpoint={data.hasBreakpoint}
+      isBreakpointActive={data.isBreakpointActive}
+      onToggleBreakpoint={data.onToggleBreakpoint}
     >
+      <div
+        className={`px-4 py-2 shadow-md rounded-md border-2 cursor-pointer transition-all duration-200 ${getStatusStyles()}`}
+        onDoubleClick={handleDoubleClick}
+        title="Double-click to edit utility functions"
+      >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Wrench className="h-4 w-4" />
@@ -161,7 +172,8 @@ export const UtilitiesNode = memo(({ data, selected, id }: NodeProps<UtilitiesNo
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </NodeWrapper>
   );
 });
 

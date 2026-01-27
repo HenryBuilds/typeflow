@@ -30,6 +30,9 @@ import {
   HttpRequestNodeDialog,
 } from "@/components/nodes/dialogs";
 import { useSaveWorkflow } from "@/hooks/use-workflows";
+import { DebugToolbar } from "@/components/debug-toolbar";
+import { DebugPanel } from "@/components/debug-panel";
+import { useDebug } from "@/hooks/use-debug";
 import { Node, Edge } from "reactflow";
 
 export default function WorkflowEditorPage() {
@@ -140,6 +143,24 @@ export default function WorkflowEditorPage() {
   const getNodesRef = useRef<(() => Node[]) | null>(null);
   const getEdgesRef = useRef<(() => Edge[]) | null>(null);
   const utils = trpc.useUtils();
+
+  // Debug hook
+  const {
+    debugState,
+    breakpoints,
+    isDebugging,
+    isPaused,
+    currentNodeId: debugCurrentNodeId,
+    startDebug,
+    stepOver,
+    continueExecution,
+    stopDebug,
+    toggleBreakpoint,
+    isStarting,
+    isStepping,
+    isContinuing,
+    isStopping,
+  } = useDebug(workflowId, organizationId);
 
   const addLog = useCallback((log: Omit<WorkflowLog, "timestamp">) => {
     setWorkflowLogs((prev) => [...prev, { ...log, timestamp: new Date() }]);
@@ -1352,6 +1373,34 @@ export default function WorkflowEditorPage() {
 
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Debug Toolbar */}
+            <div className="p-2 border-b">
+              <DebugToolbar
+                isDebugging={isDebugging}
+                isPaused={isPaused}
+                currentNodeId={debugCurrentNodeId}
+                onStartDebug={async () => {
+                  try {
+                    console.log('[Debug] Starting debug session...');
+                    await startDebug();
+                    console.log('[Debug] Debug session started successfully');
+                    // Auto-open right sidebar to show debug panel
+                    setRightSidebarOpen(true);
+                  } catch (error) {
+                    console.error('[Debug] Failed to start debug session:', error);
+                    alert(`Failed to start debug: ${error instanceof Error ? error.message : String(error)}`);
+                  }
+                }}
+                onStepOver={stepOver}
+                onContinue={continueExecution}
+                onStop={stopDebug}
+                isStarting={isStarting}
+                isStepping={isStepping}
+                isContinuing={isContinuing}
+                isStopping={isStopping}
+              />
+            </div>
+
             <div className="flex-1 overflow-hidden relative">
               <WorkflowEditor
                 organizationId={organizationId}
@@ -1371,6 +1420,10 @@ export default function WorkflowEditorPage() {
                 packageTypeDefinitions={installedPackages?.map(pkg => pkg.typeDefinitions).filter(Boolean).join('\n\n')}
                 installedPackages={installedPackages?.map(pkg => ({ name: pkg.name, version: pkg.version }))}
                 nodeOutputs={nodeOutputs}
+                debugMode={isDebugging}
+                breakpoints={breakpoints}
+                debugCurrentNodeId={debugCurrentNodeId}
+                onToggleBreakpoint={toggleBreakpoint}
                 onWebhookEdit={(nodeId, node) => {
                   setEditingWebhookNode(node);
                   setWebhookDialogOpen(true);
@@ -1595,18 +1648,32 @@ export default function WorkflowEditorPage() {
             />
           </div>
 
-          {/* Right Sidebar - Node Output */}
+          {/* Right Sidebar - Node Output or Debug Panel */}
           <div 
             className={`border-l bg-background transition-all duration-300 ease-in-out overflow-hidden shrink-0 ${
               rightSidebarOpen ? 'w-96' : 'w-0'
             }`}
           >
             <div className="w-96 h-full">
-              <NodeOutputPanel
-                selectedNodeId={selectedNodeId}
-                nodeOutputs={nodeOutputs}
-                onClose={() => setRightSidebarOpen(false)}
-              />
+              {isDebugging ? (
+                <DebugPanel
+                  isOpen={true}
+                  onClose={() => setRightSidebarOpen(false)}
+                  callStack={debugState.session?.callStack || []}
+                  nodeResults={debugState.session?.nodeResults || {}}
+                  nodeOutputs={debugState.session?.nodeOutputs || {}}
+                  breakpoints={breakpoints}
+                  currentNodeId={debugCurrentNodeId}
+                  onSelectNode={setSelectedNodeId}
+                  onToggleBreakpoint={toggleBreakpoint}
+                />
+              ) : (
+                <NodeOutputPanel
+                  selectedNodeId={selectedNodeId}
+                  nodeOutputs={nodeOutputs}
+                  onClose={() => setRightSidebarOpen(false)}
+                />
+              )}
             </div>
           </div>
 

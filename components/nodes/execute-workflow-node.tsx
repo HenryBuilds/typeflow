@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { NodeWrapper } from "./node-wrapper";
 
 interface ExecuteWorkflowNodeData {
   label?: string;
@@ -24,6 +25,9 @@ interface ExecuteWorkflowNodeData {
   isExecuting?: boolean;
   executionStatus?: "pending" | "running" | "completed" | "failed";
   errorMessage?: string;
+  hasBreakpoint?: boolean;
+  isBreakpointActive?: boolean;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export const ExecuteWorkflowNode = memo(({ data, selected, id }: NodeProps<ExecuteWorkflowNodeData>) => {
@@ -76,9 +80,10 @@ export const ExecuteWorkflowNode = memo(({ data, selected, id }: NodeProps<Execu
   const hasWorkflow = !!data.config?.workflowId;
 
   return (
-    <div
-      className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 min-w-[180px] ${getStatusStyles()}`}
-    >
+    <NodeWrapper nodeId={id} hasBreakpoint={data.hasBreakpoint} isBreakpointActive={data.isBreakpointActive} onToggleBreakpoint={data.onToggleBreakpoint}>
+      <div
+        className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 min-w-[180px] ${getStatusStyles()}`}
+      >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <GitBranch className="h-4 w-4" />
@@ -180,7 +185,8 @@ export const ExecuteWorkflowNode = memo(({ data, selected, id }: NodeProps<Execu
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </NodeWrapper>
   );
 });
 

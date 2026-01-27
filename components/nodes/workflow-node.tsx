@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { NodeWrapper } from "./node-wrapper";
 
 interface WorkflowNodeData {
   label?: string;
@@ -18,6 +19,9 @@ interface WorkflowNodeData {
   isExecuting?: boolean;
   executionStatus?: "pending" | "running" | "completed" | "failed";
   errorMessage?: string;
+  hasBreakpoint?: boolean;
+  isBreakpointActive?: boolean;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNodeData>) => {
@@ -68,9 +72,10 @@ export const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNode
   };
 
   return (
-    <div
-      className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 ${getStatusStyles()}`}
-    >
+    <NodeWrapper nodeId={id} hasBreakpoint={data.hasBreakpoint} isBreakpointActive={data.isBreakpointActive} onToggleBreakpoint={data.onToggleBreakpoint}>
+      <div
+        className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 ${getStatusStyles()}`}
+      >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Workflow className="h-4 w-4" />
@@ -148,7 +153,8 @@ export const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNode
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </NodeWrapper>
   );
 });
 

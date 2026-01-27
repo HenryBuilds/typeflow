@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { NodeWrapper } from "./node-wrapper";
 
 interface FieldDefinition {
   name: string;
@@ -28,6 +29,9 @@ interface WorkflowOutputNodeData {
   isExecuting?: boolean;
   executionStatus?: "pending" | "running" | "completed" | "failed";
   errorMessage?: string;
+  hasBreakpoint?: boolean;
+  isBreakpointActive?: boolean;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export const WorkflowOutputNode = memo(({ data, selected, id }: NodeProps<WorkflowOutputNodeData>) => {
@@ -79,9 +83,10 @@ export const WorkflowOutputNode = memo(({ data, selected, id }: NodeProps<Workfl
   const fieldCount = data.config?.fields?.length || 0;
 
   return (
-    <div
-      className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 min-w-[160px] ${getStatusStyles()}`}
-    >
+    <NodeWrapper nodeId={id} hasBreakpoint={data.hasBreakpoint} isBreakpointActive={data.isBreakpointActive} onToggleBreakpoint={data.onToggleBreakpoint}>
+      <div
+        className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 min-w-[160px] ${getStatusStyles()}`}
+      >
       {/* Only input handle - this is where data goes OUT of the subworkflow */}
       <Handle
         type="target"
@@ -175,7 +180,8 @@ export const WorkflowOutputNode = memo(({ data, selected, id }: NodeProps<Workfl
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </NodeWrapper>
   );
 });
 

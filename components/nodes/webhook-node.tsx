@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { NodeWrapper } from "./node-wrapper";
 
 interface WebhookNodeData {
   label?: string;
@@ -27,6 +28,10 @@ interface WebhookNodeData {
   errorMessage?: string;
   webhookUrl?: string; // Full URL to the webhook endpoint (only set when workflow is active)
   isWorkflowActive?: boolean; // Whether the workflow is currently active
+  // Debug props
+  hasBreakpoint?: boolean;
+  isBreakpointActive?: boolean;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export const WebhookNode = memo(({ data, selected, id }: NodeProps<WebhookNodeData>) => {
@@ -92,11 +97,17 @@ export const WebhookNode = memo(({ data, selected, id }: NodeProps<WebhookNodeDa
   };
 
   return (
-    <div
-      className={`px-4 py-2 shadow-md rounded-md border-2 cursor-pointer transition-all duration-200 ${getStatusStyles()}`}
-      onDoubleClick={handleDoubleClick}
-      title="Double-click to configure webhook"
+    <NodeWrapper
+      nodeId={id}
+      hasBreakpoint={data.hasBreakpoint}
+      isBreakpointActive={data.isBreakpointActive}
+      onToggleBreakpoint={data.onToggleBreakpoint}
     >
+      <div
+        className={`px-4 py-2 shadow-md rounded-md border-2 cursor-pointer transition-all duration-200 ${getStatusStyles()}`}
+        onDoubleClick={handleDoubleClick}
+        title="Double-click to configure webhook"
+      >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Webhook className="h-4 w-4 text-purple-500" />
@@ -201,7 +212,8 @@ export const WebhookNode = memo(({ data, selected, id }: NodeProps<WebhookNodeDa
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </NodeWrapper>
   );
 });
 

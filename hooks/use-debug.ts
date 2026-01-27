@@ -24,8 +24,8 @@ export function useDebug(workflowId: string, organizationId: string) {
 
   // Queries
   const { data: savedBreakpoints } = trpc.debug.getBreakpoints.useQuery(
-    { workflowId },
-    { enabled: !!workflowId }
+    { organizationId, workflowId },
+    { enabled: !!workflowId && !!organizationId }
   );
 
   // Mutations
@@ -67,6 +67,7 @@ export function useDebug(workflowId: string, organizationId: string) {
       try {
         // Create session
         const session = await createSessionMutation.mutateAsync({
+          organizationId,
           workflowId,
           breakpoints: Array.from(breakpoints),
           triggerData,
@@ -74,6 +75,7 @@ export function useDebug(workflowId: string, organizationId: string) {
 
         // Start execution
         const { session: updatedSession, result } = await startMutation.mutateAsync({
+          organizationId,
           sessionId: session.id,
         });
 
@@ -85,7 +87,7 @@ export function useDebug(workflowId: string, organizationId: string) {
         throw error;
       }
     },
-    [workflowId, breakpoints, createSessionMutation, startMutation, updateStateFromSession]
+    [organizationId, workflowId, breakpoints, createSessionMutation, startMutation, updateStateFromSession]
   );
 
   // Step over - execute one node
@@ -94,6 +96,7 @@ export function useDebug(workflowId: string, organizationId: string) {
 
     try {
       const { session, result } = await stepOverMutation.mutateAsync({
+        organizationId,
         sessionId: debugState.session.id,
       });
 
@@ -102,7 +105,7 @@ export function useDebug(workflowId: string, organizationId: string) {
       console.error("Failed to step over:", error);
       throw error;
     }
-  }, [debugState.session?.id, stepOverMutation, updateStateFromSession]);
+  }, [organizationId, debugState.session?.id, stepOverMutation, updateStateFromSession]);
 
   // Continue to next breakpoint
   const continueExecution = useCallback(async () => {
@@ -110,6 +113,7 @@ export function useDebug(workflowId: string, organizationId: string) {
 
     try {
       const { session, result } = await continueMutation.mutateAsync({
+        organizationId,
         sessionId: debugState.session.id,
       });
 
@@ -118,7 +122,7 @@ export function useDebug(workflowId: string, organizationId: string) {
       console.error("Failed to continue:", error);
       throw error;
     }
-  }, [debugState.session?.id, continueMutation, updateStateFromSession]);
+  }, [organizationId, debugState.session?.id, continueMutation, updateStateFromSession]);
 
   // Stop debugging
   const stopDebug = useCallback(async () => {
@@ -126,6 +130,7 @@ export function useDebug(workflowId: string, organizationId: string) {
 
     try {
       await terminateMutation.mutateAsync({
+        organizationId,
         sessionId: debugState.session.id,
       });
 
@@ -140,7 +145,7 @@ export function useDebug(workflowId: string, organizationId: string) {
       console.error("Failed to stop debug session:", error);
       throw error;
     }
-  }, [debugState.session?.id, terminateMutation]);
+  }, [organizationId, debugState.session?.id, terminateMutation]);
 
   // Toggle breakpoint on a node
   const toggleBreakpoint = useCallback(
@@ -158,13 +163,14 @@ export function useDebug(workflowId: string, organizationId: string) {
 
       try {
         await toggleBreakpointMutation.mutateAsync({
+          organizationId,
           workflowId,
           nodeId,
           enabled,
         });
 
         // Invalidate breakpoints query
-        await utils.debug.getBreakpoints.invalidate({ workflowId });
+        await utils.debug.getBreakpoints.invalidate({ organizationId, workflowId });
       } catch (error) {
         // Revert on error
         if (enabled) {
@@ -177,7 +183,7 @@ export function useDebug(workflowId: string, organizationId: string) {
         throw error;
       }
     },
-    [workflowId, breakpoints, toggleBreakpointMutation, utils]
+    [organizationId, workflowId, breakpoints, toggleBreakpointMutation, utils]
   );
 
   // Get node results for display

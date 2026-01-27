@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { BreakpointIndicator } from "@/components/breakpoint-indicator";
 
 interface CodeNodeData {
   label?: string;
@@ -29,6 +30,9 @@ interface CodeNodeData {
     sourceNodeId: string;
     output: unknown;
   }>;
+  hasBreakpoint?: boolean;
+  isBreakpointActive?: boolean;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export const CodeNode = memo(({ data, selected, id }: NodeProps<CodeNodeData>) => {
@@ -69,18 +73,21 @@ export const CodeNode = memo(({ data, selected, id }: NodeProps<CodeNodeData>) =
   // Determine border and background color based on execution status
   const getStatusStyles = () => {
     if (data.executionStatus === "completed") {
-      return "border-green-500 bg-green-50 dark:bg-green-950/20";
+      return "border-green-400 dark:border-green-500 bg-green-50/80 dark:bg-green-950/40 shadow-md shadow-green-500/10";
     }
     if (data.executionStatus === "failed") {
-      return "border-red-500 bg-red-50 dark:bg-red-950/20";
+      return "border-red-400 dark:border-red-500 bg-red-50/80 dark:bg-red-950/40 shadow-md shadow-red-500/10";
     }
     if (data.executionStatus === "running" || data.isExecuting) {
-      return "border-blue-500 bg-blue-50 dark:bg-blue-950/20 animate-pulse";
+      return "border-blue-400 dark:border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 shadow-lg shadow-blue-500/20 animate-pulse";
+    }
+    if (data.isBreakpointActive) {
+      return "border-yellow-400 dark:border-yellow-500 bg-yellow-50/80 dark:bg-yellow-950/40 shadow-lg shadow-yellow-500/20 ring-2 ring-yellow-400/30";
     }
     if (selected) {
-      return "border-blue-500 bg-white dark:bg-gray-800";
+      return "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 shadow-lg shadow-blue-500/10 ring-2 ring-blue-400/20";
     }
-    return "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800";
+    return "border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 hover:border-gray-300 dark:hover:border-gray-600";
   };
 
   const getStatusIcon = () => {
@@ -112,10 +119,19 @@ export const CodeNode = memo(({ data, selected, id }: NodeProps<CodeNodeData>) =
 
   return (
     <div
-      className={`px-4 py-2 shadow-md rounded-md border-2 cursor-pointer transition-all duration-200 ${getStatusStyles()}`}
+      className={`px-4 py-2.5 shadow-sm hover:shadow-md rounded-lg border cursor-pointer transition-all duration-300 relative backdrop-blur-sm ${getStatusStyles()}`}
       onDoubleClick={handleDoubleClick}
       title="Double-click to edit code"
     >
+      {/* Breakpoint Indicator */}
+      {data.onToggleBreakpoint && (
+        <BreakpointIndicator
+          nodeId={id}
+          hasBreakpoint={data.hasBreakpoint || false}
+          isActive={data.isBreakpointActive || false}
+          onToggle={data.onToggleBreakpoint}
+        />
+      )}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Code className="h-4 w-4" />

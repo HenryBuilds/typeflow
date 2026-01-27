@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { NodeWrapper } from "./node-wrapper";
 
 interface TriggerNodeData {
   label?: string;
@@ -19,6 +20,10 @@ interface TriggerNodeData {
   isExecuting?: boolean;
   executionStatus?: "pending" | "running" | "completed" | "failed";
   errorMessage?: string;
+  // Debug props
+  hasBreakpoint?: boolean;
+  isBreakpointActive?: boolean;
+  onToggleBreakpoint?: (nodeId: string) => void;
 }
 
 export const TriggerNode = memo(({ data, selected, id }: NodeProps<TriggerNodeData>) => {
@@ -69,82 +74,89 @@ export const TriggerNode = memo(({ data, selected, id }: NodeProps<TriggerNodeDa
   };
 
   return (
-    <div
-      className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 ${getStatusStyles()}`}
+    <NodeWrapper
+      nodeId={id}
+      hasBreakpoint={data.hasBreakpoint}
+      isBreakpointActive={data.isBreakpointActive}
+      onToggleBreakpoint={data.onToggleBreakpoint}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-yellow-500" />
-          <div className="font-bold text-sm">{data.label || "Trigger"}</div>
-          {getStatusIcon()}
+      <div
+        className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 ${getStatusStyles()}`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-yellow-500" />
+            <div className="font-bold text-sm">{data.label || "Trigger"}</div>
+            {getStatusIcon()}
+          </div>
+          <div className="flex items-center gap-1">
+            {data.onExecute && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 hover:bg-accent"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onExecute?.(id);
+                }}
+                disabled={data.isExecuting || data.executionStatus === "running"}
+                title="Execute until here"
+              >
+                <Play className={`h-3 w-3 ${data.isExecuting ? 'animate-pulse' : ''}`} />
+              </Button>
+            )}
+            {data.onDelete && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onDelete?.(id);
+                }}
+                title="Delete node"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          {data.onExecute && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 hover:bg-accent"
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onExecute?.(id);
-              }}
-              disabled={data.isExecuting || data.executionStatus === "running"}
-              title="Execute until here"
-            >
-              <Play className={`h-3 w-3 ${data.isExecuting ? 'animate-pulse' : ''}`} />
-            </Button>
-          )}
-          {data.onDelete && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
-              onClick={(e) => {
-                e.stopPropagation();
-                data.onDelete?.(id);
-              }}
-              title="Delete node"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-      </div>
-      
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="w-3 h-3 !bg-green-500"
-      />
-      
-      {/* Error Details Dialog */}
-      <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-              <AlertCircle className="h-5 w-5" />
-              Execution Error
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-auto">
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Node:</h4>
-                <p className="text-sm text-muted-foreground">{data.label || "Trigger"}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Error Message:</h4>
-                <pre className="text-xs font-mono bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded p-3 overflow-auto max-h-96 whitespace-pre-wrap break-words text-red-700 dark:text-red-400">
-                  {data.errorMessage || "Unknown error"}
-                </pre>
+        
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="w-3 h-3 !bg-green-500"
+        />
+        
+        {/* Error Details Dialog */}
+        <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+          <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <AlertCircle className="h-5 w-5" />
+                Execution Error
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Node:</h4>
+                  <p className="text-sm text-muted-foreground">{data.label || "Trigger"}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Error Message:</h4>
+                  <pre className="text-xs font-mono bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded p-3 overflow-auto max-h-96 whitespace-pre-wrap break-words text-red-700 dark:text-red-400">
+                    {data.errorMessage || "Unknown error"}
+                  </pre>
+                </div>
               </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </NodeWrapper>
   );
 });
 
