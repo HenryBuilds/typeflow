@@ -11,6 +11,8 @@ interface NavbarClientProps {
   isAuthenticated: boolean;
 }
 
+const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
 export function NavbarClient({ isAuthenticated }: NavbarClientProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -31,6 +33,21 @@ export function NavbarClient({ isAuthenticated }: NavbarClientProps) {
   };
 
   const ThemeIcon = mounted && theme === "dark" ? Sun : Moon;
+
+  // Demo mode: only show theme toggle
+  if (isDemoMode) {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={toggleTheme}
+        aria-label="Toggle theme"
+        suppressHydrationWarning
+      >
+        <ThemeIcon className="h-5 w-5" />
+      </Button>
+    );
+  }
 
   return (
     <>
