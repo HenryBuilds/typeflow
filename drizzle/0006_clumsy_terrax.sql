@@ -1,0 +1,1 @@
+ALTER TABLE "webhooks" ADD COLUMN "response_mode" text DEFAULT 'waitForResult' NOT NULL;
