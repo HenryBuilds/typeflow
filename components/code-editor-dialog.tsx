@@ -1144,8 +1144,8 @@ ${utilities.map(util => {
 
           return null;
         },
-        // CATCH-ALL OVERRIDE (MUST BE LAST): Block JavaScript's built-in autocomplete
-        // This prevents suggestions for non-existent properties like z.User
+        // CATCH-ALL OVERRIDE (MUST BE LAST): Provide useful suggestions for local variables
+        // This shows array/object methods for any variable access
         (context) => {
           // Get the text before cursor to check what the user is typing
           const line = context.state.doc.lineAt(context.pos);
@@ -1156,19 +1156,83 @@ ${utilities.map(util => {
 
           if (dotMatch) {
             const objectName = dotMatch[1];
+            const partialProperty = dotMatch[2];
 
-            // Allow our custom overrides to handle these cases
+            // Allow our custom overrides to handle $ variables
             if (objectName.startsWith('$') ||
                 objectName === 'credentials' ||
                 textBefore.includes('$credentials.')) {
               return null; // Let our custom overrides handle it
             }
 
-            // For everything else (like z., axios., etc.), block autocomplete
-            // Return empty options to prevent wrong suggestions
+            // For local variables, provide helpful array and object methods
+            const commonArrayMethods = [
+              { label: 'map', type: 'method', info: 'map<U>(callbackfn: (value, index, array) => U): U[]', boost: 99 },
+              { label: 'filter', type: 'method', info: 'filter(predicate: (value, index, array) => boolean): T[]', boost: 98 },
+              { label: 'find', type: 'method', info: 'find(predicate: (value, index, obj) => boolean): T | undefined', boost: 97 },
+              { label: 'findIndex', type: 'method', info: 'findIndex(predicate: (value, index, obj) => boolean): number', boost: 90 },
+              { label: 'forEach', type: 'method', info: 'forEach(callbackfn: (value, index, array) => void): void', boost: 96 },
+              { label: 'reduce', type: 'method', info: 'reduce<U>(callbackfn: (prev, curr, idx, arr) => U, init: U): U', boost: 95 },
+              { label: 'some', type: 'method', info: 'some(predicate: (value, index, array) => boolean): boolean', boost: 85 },
+              { label: 'every', type: 'method', info: 'every(predicate: (value, index, array) => boolean): boolean', boost: 84 },
+              { label: 'includes', type: 'method', info: 'includes(searchElement: T, fromIndex?: number): boolean', boost: 88 },
+              { label: 'indexOf', type: 'method', info: 'indexOf(searchElement: T, fromIndex?: number): number', boost: 83 },
+              { label: 'join', type: 'method', info: 'join(separator?: string): string', boost: 82 },
+              { label: 'slice', type: 'method', info: 'slice(start?: number, end?: number): T[]', boost: 81 },
+              { label: 'concat', type: 'method', info: 'concat(...items: T[]): T[]', boost: 80 },
+              { label: 'push', type: 'method', info: 'push(...items: T[]): number', boost: 79 },
+              { label: 'pop', type: 'method', info: 'pop(): T | undefined', boost: 78 },
+              { label: 'shift', type: 'method', info: 'shift(): T | undefined', boost: 77 },
+              { label: 'unshift', type: 'method', info: 'unshift(...items: T[]): number', boost: 76 },
+              { label: 'sort', type: 'method', info: 'sort(compareFn?: (a, b) => number): T[]', boost: 75 },
+              { label: 'reverse', type: 'method', info: 'reverse(): T[]', boost: 74 },
+              { label: 'flat', type: 'method', info: 'flat(depth?: number): any[]', boost: 70 },
+              { label: 'flatMap', type: 'method', info: 'flatMap<U>(callback: (value, index, array) => U[]): U[]', boost: 69 },
+              { label: 'at', type: 'method', info: 'at(index: number): T | undefined', boost: 68 },
+              { label: 'length', type: 'property', info: 'number - Array length', boost: 100 },
+            ];
+
+            const commonObjectMethods = [
+              { label: 'toString', type: 'method', info: 'toString(): string', boost: 50 },
+              { label: 'valueOf', type: 'method', info: 'valueOf(): Object', boost: 49 },
+              { label: 'hasOwnProperty', type: 'method', info: 'hasOwnProperty(v: string): boolean', boost: 48 },
+            ];
+
+            const commonStringMethods = [
+              { label: 'length', type: 'property', info: 'number - String length', boost: 100 },
+              { label: 'split', type: 'method', info: 'split(separator: string, limit?: number): string[]', boost: 95 },
+              { label: 'trim', type: 'method', info: 'trim(): string', boost: 94 },
+              { label: 'toLowerCase', type: 'method', info: 'toLowerCase(): string', boost: 93 },
+              { label: 'toUpperCase', type: 'method', info: 'toUpperCase(): string', boost: 92 },
+              { label: 'includes', type: 'method', info: 'includes(search: string): boolean', boost: 91 },
+              { label: 'startsWith', type: 'method', info: 'startsWith(search: string): boolean', boost: 90 },
+              { label: 'endsWith', type: 'method', info: 'endsWith(search: string): boolean', boost: 89 },
+              { label: 'replace', type: 'method', info: 'replace(search: string | RegExp, replace: string): string', boost: 88 },
+              { label: 'replaceAll', type: 'method', info: 'replaceAll(search: string, replace: string): string', boost: 87 },
+              { label: 'substring', type: 'method', info: 'substring(start: number, end?: number): string', boost: 86 },
+              { label: 'slice', type: 'method', info: 'slice(start?: number, end?: number): string', boost: 85 },
+              { label: 'charAt', type: 'method', info: 'charAt(index: number): string', boost: 84 },
+              { label: 'indexOf', type: 'method', info: 'indexOf(search: string): number', boost: 83 },
+              { label: 'match', type: 'method', info: 'match(regexp: RegExp): RegExpMatchArray | null', boost: 82 },
+              { label: 'padStart', type: 'method', info: 'padStart(length: number, fill?: string): string', boost: 70 },
+              { label: 'padEnd', type: 'method', info: 'padEnd(length: number, fill?: string): string', boost: 69 },
+            ];
+
+            // Combine all methods - array methods first (most commonly needed)
+            const allMethods = [...commonArrayMethods, ...commonStringMethods, ...commonObjectMethods];
+            
+            // Filter by what user has typed
+            const filteredMethods = partialProperty 
+              ? allMethods.filter(m => m.label.toLowerCase().startsWith(partialProperty.toLowerCase()))
+              : allMethods;
+
+            // Calculate position after the dot
+            const dotPos = line.from + textBefore.lastIndexOf('.') + 1;
+
             return {
-              from: context.pos,
-              options: [],
+              from: dotPos,
+              options: filteredMethods,
+              validFor: /^[\w]*$/,
             };
           }
 

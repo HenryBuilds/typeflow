@@ -1396,6 +1396,9 @@ declare const $credentials: Record<string, any>;
             "'await' expressions are only allowed", // Top-level await is allowed in wrapped code
             "'return' statement can only be used", // Return is allowed - code is in a function at runtime
             "A 'return' statement can only be used", // Same as above
+            "does not exist on type '{}'", // False positive when TypeScript can't infer literal types
+            "does not exist on type 'never'", // False positive with empty arrays
+            "Property 'length' does not exist", // Common false positive with arrays
           ];
           
           if (skipErrorPatterns.some(pattern => message.includes(pattern))) {
