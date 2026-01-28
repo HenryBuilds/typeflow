@@ -205,3 +205,13 @@ body {
     @apply border-primary/50 bg-primary/10 animate-pulse shadow-md shadow-primary/20;
   }
 }
+
+/* Landing page animations */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 50%;
+  }
+  100% {
+    background-position: -200% 50%;
+  }
+}

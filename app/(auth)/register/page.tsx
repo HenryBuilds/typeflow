@@ -36,8 +36,24 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="relative flex min-h-screen items-center justify-center p-4 overflow-hidden">
+      {/* Animated Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div 
+          className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[128px]" 
+          style={{ animation: 'pulse 8s ease-in-out infinite' }}
+        />
+        <div 
+          className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-chart-2/15 rounded-full blur-[128px]" 
+          style={{ animation: 'pulse 10s ease-in-out infinite', animationDelay: '3s' }}
+        />
+        <div 
+          className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-chart-3/10 rounded-full blur-[100px]" 
+          style={{ animation: 'pulse 12s ease-in-out infinite', animationDelay: '6s' }}
+        />
+      </div>
+      
+      <Card className="relative z-10 w-full max-w-md bg-card/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Create an account</CardTitle>
           <CardDescription>
