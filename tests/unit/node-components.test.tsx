@@ -536,7 +536,11 @@ describe('Node Callback Handling', () => {
   })
 
   it('should not call callbacks when undefined', () => {
-    const data = {
+    const data: {
+      onEdit?: (id: string) => void
+      onExecute?: (id: string) => void
+      onDelete?: (id: string) => void
+    } = {
       onEdit: undefined,
       onExecute: undefined,
       onDelete: undefined,

@@ -11,6 +11,7 @@ import type {
   DebugExecutionResult,
   DebugStackFrame,
   DebugPreviousState,
+  NodeExecutionResult,
 } from "@/types/debugger";
 
 // Execution item structure
@@ -22,14 +23,7 @@ interface ExecutionItem {
   };
 }
 
-interface NodeExecutionResult {
-  nodeId: string;
-  nodeLabel?: string; // Store label for matching when IDs change
-  status: "completed" | "failed";
-  output?: ExecutionItem[]; // Array of execution items
-  error?: string;
-  duration: number;
-}
+// NodeExecutionResult imported from types/debugger
 
 interface WorkflowExecutionResult {
   success: boolean;

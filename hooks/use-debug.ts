@@ -8,7 +8,18 @@ import type {
   DebugStackFrame,
   NodeExecutionResult,
   ExecutionItem,
+
 } from "@/types/debugger";
+
+// Helper to parse session from API (dates match string in JSON)
+function parseSession(session: any): DebugSession {
+  if (!session) return session;
+  return {
+    ...session,
+    createdAt: new Date(session.createdAt),
+    updatedAt: new Date(session.updatedAt),
+  } as DebugSession;
+}
 
 export function useDebug(workflowId: string, organizationId: string) {
   const [debugState, setDebugState] = useState<DebugState>({
@@ -79,7 +90,10 @@ export function useDebug(workflowId: string, organizationId: string) {
           sessionId: session.id,
         });
 
-        updateStateFromSession(updatedSession as unknown as DebugSession, result);
+        updateStateFromSession(parseSession(updatedSession), {
+          isPaused: result.isPaused,
+          callStack: result.callStack || undefined,
+        });
 
         return updatedSession;
       } catch (error) {
@@ -100,7 +114,10 @@ export function useDebug(workflowId: string, organizationId: string) {
         sessionId: debugState.session.id,
       });
 
-      updateStateFromSession(session as unknown as DebugSession, result);
+      updateStateFromSession(parseSession(session), {
+        isPaused: result.isPaused,
+        callStack: result.callStack || undefined,
+      });
     } catch (error) {
       console.error("Failed to step over:", error);
       throw error;
@@ -117,7 +134,10 @@ export function useDebug(workflowId: string, organizationId: string) {
         sessionId: debugState.session.id,
       });
 
-      updateStateFromSession(session as unknown as DebugSession, result);
+      updateStateFromSession(parseSession(session), {
+        isPaused: result.isPaused,
+        callStack: result.callStack || undefined,
+      });
     } catch (error) {
       console.error("Failed to continue:", error);
       throw error;

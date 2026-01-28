@@ -86,9 +86,7 @@ export const debugRouter = router({
           previousState: session.currentNodeId
             ? {
                 nodeResults: (session.nodeResults || {}) as Record<string, NodeExecutionResult>,
-                nodeOutputs: new Map(
-                  Object.entries((session.nodeOutputs || {}) as Record<string, ExecutionItem[]>)
-                ),
+                nodeOutputs: (session.nodeOutputs || {}) as Record<string, ExecutionItem[]>,
                 lastExecutedNodeId: session.currentNodeId,
                 callStack: (session.callStack || []) as DebugStackFrame[],
               }
@@ -182,9 +180,7 @@ export const debugRouter = router({
         targetNodeId,
         {
           nodeResults: (session.nodeResults || {}) as Record<string, NodeExecutionResult>,
-          nodeOutputs: new Map(
-            Object.entries((session.nodeOutputs || {}) as Record<string, ExecutionItem[]>)
-          ),
+          nodeOutputs: (session.nodeOutputs || {}) as Record<string, ExecutionItem[]>,
           lastExecutedNodeId: session.currentNodeId || undefined,
           callStack: (session.callStack || []) as DebugStackFrame[],
         },
@@ -250,9 +246,7 @@ export const debugRouter = router({
           captureStackTraces: true,
           previousState: {
             nodeResults: (session.nodeResults || {}) as Record<string, NodeExecutionResult>,
-            nodeOutputs: new Map(
-              Object.entries((session.nodeOutputs || {}) as Record<string, ExecutionItem[]>)
-            ),
+                nodeOutputs: (session.nodeOutputs || {}) as Record<string, ExecutionItem[]>,
             lastExecutedNodeId: session.currentNodeId || undefined,
             callStack: (session.callStack || []) as DebugStackFrame[],
           },
