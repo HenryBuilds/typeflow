@@ -30,6 +30,10 @@ interface WorkflowLogPanelProps {
   onClear?: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  height?: number;
+  onHeightChange?: (height: number) => void;
+  isResizing?: boolean;
+  onResizingChange?: (isResizing: boolean) => void;
 }
 
 export function WorkflowLogPanel({
@@ -38,6 +42,10 @@ export function WorkflowLogPanel({
   onClear,
   isCollapsed = false,
   onToggleCollapse,
+  height = 200,
+  onHeightChange,
+  isResizing = false,
+  onResizingChange,
 }: WorkflowLogPanelProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(false); // Disabled by default to prevent unwanted scrolling
@@ -119,7 +127,34 @@ export function WorkflowLogPanel({
   }
 
   return (
-    <Card className="rounded-none border-0 border-t flex flex-col h-[250px]">
+    <Card className={`rounded-none border-0 border-t flex flex-col relative ${!isResizing ? 'transition-all duration-200' : ''}`} style={{ height: `${height}px` }}>
+      {/* Resize Handle */}
+      {onHeightChange && onResizingChange && (
+        <div
+          className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-primary/50 transition-colors z-20"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onResizingChange(true);
+            const startY = e.clientY;
+            const startHeight = height;
+
+            const handleMouseMove = (e: MouseEvent) => {
+              const delta = startY - e.clientY;
+              const newHeight = Math.max(100, Math.min(600, startHeight + delta));
+              onHeightChange(newHeight);
+            };
+
+            const handleMouseUp = () => {
+              onResizingChange(false);
+              document.removeEventListener('mousemove', handleMouseMove);
+              document.removeEventListener('mouseup', handleMouseUp);
+            };
+
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+          }}
+        />
+      )}
       <CardHeader className="pb-2 border-b bg-muted/30">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

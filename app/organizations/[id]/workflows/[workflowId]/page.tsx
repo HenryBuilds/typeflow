@@ -68,6 +68,10 @@ export default function WorkflowEditorPage() {
   const [executingNodeId, setExecutingNodeId] = useState<string | null>(null);
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(320); // Default width in pixels
+  const [isResizing, setIsResizing] = useState(false);
+  const [logPanelHeight, setLogPanelHeight] = useState(200); // Default height in pixels
+  const [isResizingLogPanel, setIsResizingLogPanel] = useState(false);
   const [typeDefinitionsOpen, setTypeDefinitionsOpen] = useState(false);
   const [packagesDialogOpen, setPackagesDialogOpen] = useState(false);
   const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
@@ -1833,16 +1837,48 @@ export default function WorkflowEditorPage() {
               onClear={() => setWorkflowLogs([])}
               isCollapsed={logPanelCollapsed}
               onToggleCollapse={() => setLogPanelCollapsed(!logPanelCollapsed)}
+              height={logPanelHeight}
+              onHeightChange={setLogPanelHeight}
+              isResizing={isResizingLogPanel}
+              onResizingChange={setIsResizingLogPanel}
             />
           </div>
 
           {/* Right Sidebar - Node Output or Debug Panel */}
           <div 
-            className={`border-l bg-background transition-all duration-300 ease-in-out overflow-hidden shrink-0 ${
-              rightSidebarOpen ? 'w-96' : 'w-0'
-            }`}
+            className={`border-l bg-background overflow-hidden shrink-0 relative ${
+              rightSidebarOpen ? '' : 'w-0'
+            } ${!isResizing ? 'transition-all duration-300 ease-in-out' : ''}`}
+            style={{ width: rightSidebarOpen ? `${rightSidebarWidth}px` : '0' }}
           >
-            <div className="w-96 h-full">
+            {/* Resize Handle */}
+            {rightSidebarOpen && (
+              <div
+                className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 transition-colors z-20"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsResizing(true);
+                  const startX = e.clientX;
+                  const startWidth = rightSidebarWidth;
+
+                  const handleMouseMove = (e: MouseEvent) => {
+                    const delta = startX - e.clientX;
+                    const newWidth = Math.max(250, Math.min(800, startWidth + delta));
+                    setRightSidebarWidth(newWidth);
+                  };
+
+                  const handleMouseUp = () => {
+                    setIsResizing(false);
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                  };
+
+                  document.addEventListener('mousemove', handleMouseMove);
+                  document.addEventListener('mouseup', handleMouseUp);
+                }}
+              />
+            )}
+            <div className="h-full" style={{ width: `${rightSidebarWidth}px` }}>
               {isDebugging ? (
                 <DebugPanel
                   isOpen={true}
