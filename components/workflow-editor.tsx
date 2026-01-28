@@ -14,6 +14,7 @@ import ReactFlow, {
   BackgroundVariant,
   NodeTypes,
   ReactFlowInstance,
+  ConnectionLineType,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { CodeNode } from "./nodes/code-node";
@@ -1041,6 +1042,7 @@ export function WorkflowEditor({
           deleteKeyCode={["Backspace", "Delete"]}
           edgesUpdatable={true}
           edgesFocusable={true}
+          connectionLineType={ConnectionLineType.SmoothStep}
           onNodeClick={(_, node) => {
             if (onNodeSelect) {
               onNodeSelect(selectedNodeId === node.id ? null : node.id);
