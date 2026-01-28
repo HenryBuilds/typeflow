@@ -1,23 +1,7 @@
-// Debug types for workflow debugging with breakpoints
+import { ExecutionItem, NodeExecutionResult } from "./execution";
 
-// Execution item structure (matches workflow-executor.ts)
-export interface ExecutionItem {
-  json: Record<string, unknown>;
-  binary?: Record<string, unknown>;
-  pairedItem?: {
-    item: number;
-  };
-}
-
-// Node execution result (matches workflow-executor.ts)
-export interface NodeExecutionResult {
-  nodeId: string;
-  nodeLabel?: string;
-  status: "pending" | "running" | "completed" | "failed";
-  output?: ExecutionItem[];
-  error?: string;
-  duration?: number;
-}
+// Re-export specific types if needed, or rely on imports
+export type { ExecutionItem, NodeExecutionResult };
 
 // Debug session status
 export type DebugSessionStatus = "active" | "paused" | "completed" | "terminated";

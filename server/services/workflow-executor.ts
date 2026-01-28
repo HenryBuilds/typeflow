@@ -11,26 +11,14 @@ import type {
   DebugExecutionResult,
   DebugStackFrame,
   DebugPreviousState,
-  NodeExecutionResult,
 } from "@/types/debugger";
+import type {
+  ExecutionItem,
+  NodeExecutionResult,
+  WorkflowExecutionResult,
+} from "@/types/execution";
 
-// Execution item structure
-interface ExecutionItem {
-  json: Record<string, unknown>;
-  binary?: Record<string, unknown>;
-  pairedItem?: {
-    item: number;
-  };
-}
-
-// NodeExecutionResult imported from types/debugger
-
-interface WorkflowExecutionResult {
-  success: boolean;
-  nodeResults: Record<string, NodeExecutionResult>;
-  finalOutput?: ExecutionItem[]; // Array of execution items
-  error?: string;
-}
+// ExecutionItem, NodeExecutionResult, WorkflowExecutionResult imported from types/execution
 
 export class WorkflowExecutor {
   async executeUntilNode(

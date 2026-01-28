@@ -43,6 +43,7 @@ import { ManualTriggerNode } from "./nodes/manual-trigger-node";
 import { ChatTriggerNode } from "./nodes/chat-trigger-node";
 import { CodeEditorDialog } from "./code-editor-dialog";
 import { DeletableEdge } from "./deletable-edge";
+import { Workflow, WorkflowNode as WorkflowNodeType, WorkflowConnection } from "@/types/domain";
 
 const nodeTypes: NodeTypes = {
   code: CodeNode,
@@ -77,28 +78,9 @@ const edgeTypes = {
 
 interface WorkflowEditorProps {
   organizationId?: string; // Organization ID for loading credentials
-  workflow: {
-    id: string;
-    name: string;
-    isActive?: boolean; // Whether the workflow is active
-    nodes: Array<{
-      id: string;
-      type: string;
-      label: string;
-      position: { x: number; y: number };
-      config?: Record<string, unknown> | null;
-      executionOrder?: number;
-    }>;
-    connections: Array<{
-      id: string;
-      sourceNodeId: string;
-      targetNodeId: string;
-      sourceHandle?: string | null;
-      targetHandle?: string | null;
-    }>;
-    metadata?: {
-      viewport?: { x: number; y: number; zoom: number };
-    };
+  workflow: Workflow & {
+    nodes: WorkflowNodeType[];
+    connections: WorkflowConnection[];
   };
   onSave?: (data: {
     nodes: Node[];
