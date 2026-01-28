@@ -18,6 +18,9 @@ import {
   Github
 } from "lucide-react";
 
+const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+const githubUrl = "https://github.com/HenryBuilds/typeflow";
+
 export default function LandingPage() {
   const [activePreview, setActivePreview] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
@@ -135,17 +138,33 @@ export default function LandingPage() {
 
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Link
-                href="/organizations"
-                className="group relative overflow-hidden rounded-full"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-primary via-chart-5 to-primary bg-[length:200%_100%] animate-[shimmer_3s_ease-in-out_infinite] rounded-full" />
-                <div className="relative flex items-center justify-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-full text-sm font-semibold transition-all m-[2px]">
-                  <Sparkles className="h-4 w-4 transition-transform group-hover:rotate-12" />
-                  Start Building
-                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                </div>
-              </Link>
+              {isDemoMode ? (
+                <a
+                  href={githubUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative overflow-hidden rounded-full"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary via-chart-5 to-primary bg-[length:200%_100%] animate-[shimmer_3s_ease-in-out_infinite] rounded-full" />
+                  <div className="relative flex items-center justify-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-full text-sm font-semibold transition-all m-[2px]">
+                    <Sparkles className="h-4 w-4 transition-transform group-hover:rotate-12" />
+                    View on GitHub
+                    <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </a>
+              ) : (
+                <Link
+                  href="/organizations"
+                  className="group relative overflow-hidden rounded-full"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary via-chart-5 to-primary bg-[length:200%_100%] animate-[shimmer_3s_ease-in-out_infinite] rounded-full" />
+                  <div className="relative flex items-center justify-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-full text-sm font-semibold transition-all m-[2px]">
+                    <Sparkles className="h-4 w-4 transition-transform group-hover:rotate-12" />
+                    Start Building
+                    <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </Link>
+              )}
               <a
                 href="#features"
                 className="group flex items-center justify-center gap-1.5 bg-secondary/50 backdrop-blur-sm border border-primary/20 hover:border-primary/50 hover:bg-secondary px-5 py-2.5 rounded-full text-sm font-semibold transition-all hover:shadow-md hover:shadow-primary/10"
@@ -361,13 +380,25 @@ export default function LandingPage() {
             Start building powerful workflows with TypeScript today. 
             It&apos;s free, open-source, and developer-first.
           </p>
-          <Link
-            href="/organizations"
-            className="group inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-full text-base font-semibold transition-all shadow-lg"
-          >
-            Get Started — It&apos;s Free
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
+          {isDemoMode ? (
+            <a
+              href={githubUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-full text-base font-semibold transition-all shadow-lg"
+            >
+              View on GitHub
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </a>
+          ) : (
+            <Link
+              href="/organizations"
+              className="group inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-full text-base font-semibold transition-all shadow-lg"
+            >
+              Get Started — It&apos;s Free
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          )}
         </div>
       </section>
 
