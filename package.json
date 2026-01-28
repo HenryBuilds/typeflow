@@ -15,9 +15,13 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "worker": "tsx workers/workflow-worker.ts",
+    "worker:dev": "tsx watch workers/workflow-worker.ts"
   },
   "dependencies": {
+    "@bull-board/api": "^6.16.4",
+    "@bull-board/express": "^6.16.4",
     "@codemirror/autocomplete": "^6.20.0",
     "@codemirror/lang-javascript": "^6.2.4",
     "@codemirror/lint": "^6.9.2",
@@ -39,11 +43,13 @@
     "@uiw/codemirror-theme-vscode": "^4.25.4",
     "@uiw/react-codemirror": "^4.25.4",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^5.67.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
+    "ioredis": "^5.9.2",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.562.0",
     "mongodb": "^6.0.0",
