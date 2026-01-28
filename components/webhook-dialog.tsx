@@ -91,7 +91,7 @@ export function WebhookDialog({
         }
       }
       setWebhookId(foundWebhookId);
-      console.log('[WEBHOOK DIALOG INIT] webhookId:', foundWebhookId, 'path:', initialConfig?.path, 'from query:', !!existingWebhookQuery.data);
+      
     }
   }, [open, initialConfig, initialLabel, existingWebhookQuery.data, workflowId]);
 
@@ -126,12 +126,12 @@ export function WebhookDialog({
     }
 
     try {
-      console.log('[WEBHOOK SAVE] webhookId:', webhookId, 'path:', path);
+      
       
       if (webhookId) {
         // Update existing webhook - only send responseMode, not path
         // Path changes are not supported in update to avoid duplicate path issues
-        console.log('[WEBHOOK SAVE] Calling UPDATE with responseMode:', responseMode);
+        
         await updateMutation.mutateAsync({
           organizationId,
           id: webhookId,
@@ -237,20 +237,20 @@ export function WebhookDialog({
     // Poll for new requests every 2 seconds
     const intervalId = setInterval(async () => {
       try {
-        console.log("Polling for webhook requests...", currentWebhookId);
+        
         const latestRequest = await utils.client.webhooks.getLatestRequest.query({
           organizationId,
           webhookId: currentWebhookId!,
         });
 
-        console.log("Latest request:", latestRequest);
+        
 
         if (latestRequest) {
           const isNewRequest = !receivedRequest || 
             new Date(latestRequest.receivedAt).getTime() > new Date(receivedRequest.receivedAt || 0).getTime();
           
           if (isNewRequest) {
-            console.log("New request detected!");
+            
             setReceivedRequest(latestRequest);
             
             // Stop listening after receiving request
@@ -261,7 +261,7 @@ export function WebhookDialog({
             // Auto-execute workflow with the received data
             if (onTestFlow) {
               setTimeout(() => {
-                console.log("Executing workflow with request data");
+                
                 onTestFlow({
                   headers: latestRequest.headers as Record<string, string>,
                   body: latestRequest.body as Record<string, unknown>,

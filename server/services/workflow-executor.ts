@@ -195,7 +195,7 @@ export class WorkflowExecutor {
           }
         }
 
-        console.log(`Executing node ${currentNodeId} (${currentNode.type}) with ${inputItems.length} input items`);
+        
 
         let outputItems: ExecutionItem[] = [];
 
@@ -227,7 +227,7 @@ export class WorkflowExecutor {
           }
           
           outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, organizationId, typeDefinitions, utilities);
-          console.log(`${currentNode.type === "webhookResponse" ? "Webhook Response" : "Code"} node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "trigger" || currentNode.type === "webhook") {
           outputItems = inputItems;
         } else if (currentNode.type === "utilities") {
@@ -266,11 +266,7 @@ export class WorkflowExecutor {
         }
 
         const duration = Date.now() - startTime;
-        console.log(`Node ${currentNodeId} execution completed:`, {
-          inputItemsCount: inputItems.length,
-          outputItemsCount: outputItems.length,
-          firstOutputItem: outputItems[0],
-        });
+        
 
         nodeOutputs.set(currentNodeId, outputItems);
         nodeResults[currentNodeId] = {
@@ -452,9 +448,7 @@ export class WorkflowExecutor {
           }
         }
 
-        console.log(
-          `Executing node ${currentNodeId} (${currentNode.type}) with ${inputItems.length} input items`
-        );
+        
 
         let outputItems: ExecutionItem[] = [];
 
@@ -489,9 +483,7 @@ export class WorkflowExecutor {
           }
           
           outputItems = await this.executeCodeNode(currentNode, inputItems, predecessorOutputs, organizationId, typeDefinitions, utilities);
-          console.log(
-            `${currentNode.type === "webhookResponse" ? "Webhook Response" : "Code"} node ${currentNodeId} returned ${outputItems.length} items`
-          );
+          
         } else if (currentNode.type === "trigger" || currentNode.type === "webhook") {
           outputItems = inputItems; // Trigger just passes through
         } else if (currentNode.type === "utilities") {
@@ -500,7 +492,7 @@ export class WorkflowExecutor {
         } else if (currentNode.type === "executeWorkflow") {
           // Execute a subworkflow
           outputItems = await this.executeSubworkflow(currentNode, inputItems, organizationId);
-          console.log(`Execute Workflow node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "manualTrigger" || currentNode.type === "scheduleTrigger" || currentNode.type === "chatTrigger") {
           // Trigger nodes - pass through trigger data or empty item
           outputItems = inputItems.length > 0 ? inputItems : [{ json: {} }];
@@ -509,49 +501,45 @@ export class WorkflowExecutor {
           outputItems = inputItems;
         } else if (currentNode.type === "filter") {
           outputItems = this.executeFilterNode(currentNode, inputItems);
-          console.log(`Filter node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "limit") {
           outputItems = this.executeLimitNode(currentNode, inputItems);
-          console.log(`Limit node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "removeDuplicates") {
           outputItems = this.executeRemoveDuplicatesNode(currentNode, inputItems);
-          console.log(`RemoveDuplicates node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "splitOut") {
           outputItems = this.executeSplitOutNode(currentNode, inputItems);
-          console.log(`SplitOut node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "aggregate") {
           outputItems = this.executeAggregateNode(currentNode, inputItems);
-          console.log(`Aggregate node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "merge") {
           // Merge node gets inputs from multiple sources - already combined in inputItems
           outputItems = this.executeMergeNode(currentNode, inputItems);
-          console.log(`Merge node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "summarize") {
           outputItems = this.executeSummarizeNode(currentNode, inputItems);
-          console.log(`Summarize node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "dateTime") {
           outputItems = this.executeDateTimeNode(currentNode, inputItems);
-          console.log(`DateTime node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "editFields") {
           outputItems = this.executeEditFieldsNode(currentNode, inputItems);
-          console.log(`EditFields node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "httpRequest") {
           outputItems = await this.executeHttpRequestNode(currentNode, inputItems);
-          console.log(`HttpRequest node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else if (currentNode.type === "wait") {
           outputItems = await this.executeWaitNode(currentNode, inputItems);
-          console.log(`Wait node ${currentNodeId} returned ${outputItems.length} items`);
+          
         } else {
           // Generic node - just pass through
           outputItems = inputItems;
         }
 
         const duration = Date.now() - startTime;
-        console.log(`Node ${currentNodeId} execution completed:`, {
-          inputItemsCount: inputItems.length,
-          outputItemsCount: outputItems.length,
-          firstOutputItem: outputItems[0],
-        });
+        
         nodeOutputs.set(currentNodeId, outputItems);
         nodeResults[currentNodeId] = {
           nodeId: currentNodeId,
@@ -1362,7 +1350,7 @@ ${utilitiesDeclarations}
             // Build safe console first
             const safeConsole = {
               log: (...args: unknown[]) => {
-                console.log("[Node Execution]", ...args);
+                
               },
               error: (...args: unknown[]) => {
                 console.error("[Node Execution]", ...args);
@@ -2122,7 +2110,7 @@ ${utilitiesDeclarations}
     const subworkflowId = config.workflowId;
     const mode = config.mode || "once";
 
-    console.log(`Executing subworkflow ${subworkflowId} in mode: ${mode}`);
+    
 
     try {
       if (mode === "once") {
@@ -2156,7 +2144,7 @@ ${utilitiesDeclarations}
             json: item.json,
           };
 
-          console.log(`Executing subworkflow for item ${i + 1}/${inputItems.length}`);
+          
 
           const result = await this.executeWorkflow(
             subworkflowId,

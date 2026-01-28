@@ -1,118 +1,91 @@
+/**
+ * tRPC HTTP Response Handler for App Router
+ * @see https://trpc.io/docs/v11/adapters/fetch
+ */
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "@/server/index";
-import { db } from "@/db/db";
-import { verifyToken } from "@/lib/jwt";
+import { createContext } from "@/server/context";
 import { cookies } from "next/headers";
 
-function extractProcedurePath(pathname: string): string {
-  const match = pathname.match(/\/api\/trpc\/(.+)$/);
-  return match ? match[1] : "";
-}
+// Cookie configuration
+const COOKIE_NAME = "token";
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
 
-function extractTokenFromResponse(data: unknown): string | null {
-  if (data && typeof data === "object") {
-    if ("result" in data && data.result && typeof data.result === "object") {
-      if ("data" in data.result && data.result.data && typeof data.result.data === "object") {
-        if ("token" in data.result.data && typeof data.result.data.token === "string") {
-          return data.result.data.token;
-        }
-      }
-    }
-    if (Array.isArray(data) && data.length > 0) {
-      return extractTokenFromResponse(data[0]);
-    }
-  }
-  return null;
-}
-
+/**
+ * Set auth cookie on successful login
+ */
 function setAuthCookie(response: Response, token: string): Response {
   const headers = new Headers(response.headers);
   const isProduction = process.env.NODE_ENV === "production";
-  const cookieOptions = [
-    `token=${token}`,
+  
+  headers.set("Set-Cookie", [
+    `${COOKIE_NAME}=${token}`,
     "Path=/",
-    `Max-Age=${7 * 24 * 60 * 60}`,
+    `Max-Age=${COOKIE_MAX_AGE}`,
     "SameSite=Lax",
     "HttpOnly",
     ...(isProduction ? ["Secure"] : []),
-  ].join("; ");
-
-  headers.set("Set-Cookie", cookieOptions);
-
-  return new Response(response.body, {
-    status: response.status,
-    headers,
-  });
+  ].join("; "));
+  
+  return new Response(response.body, { status: response.status, headers });
 }
 
+/**
+ * Clear auth cookie on logout
+ */
 function clearAuthCookie(response: Response): Response {
   const headers = new Headers(response.headers);
-  headers.set("Set-Cookie", "token=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly");
-
-  return new Response(response.body, {
-    status: response.status,
-    headers,
-  });
+  headers.set("Set-Cookie", `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly`);
+  return new Response(response.body, { status: response.status, headers });
 }
 
-const handler = async (req: Request) => {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-  let userId: string | null = null;
+/**
+ * Extract token from TRPC response data
+ */
+function extractToken(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  if (Array.isArray(data)) return extractToken(data[0]);
+  
+  const obj = data as Record<string, unknown>;
+  const token = (obj.result as Record<string, unknown>)?.data as Record<string, unknown>;
+  return typeof token?.token === "string" ? token.token : null;
+}
 
-  if (token) {
-    const payload = verifyToken(token);
-    if (payload) {
-      userId = payload.userId;
-    }
-  }
-
+/**
+ * Main handler
+ */
+const handler = async (req: Request): Promise<Response> => {
   const url = new URL(req.url);
-  const procedurePath = extractProcedurePath(url.pathname);
+  const procedurePath = url.pathname.split("/api/trpc/")[1] ?? "";
 
   const response = await fetchRequestHandler({
     endpoint: "/api/trpc",
     req,
     router: appRouter,
-    createContext: async () => {
-      return {
-        db,
-        userId,
-      };
-    },
-    onError: ({ error, path }) => {
-      console.error(`tRPC Error on '${path}':`, error);
-      
-      // Check if this is a Postgres unique constraint violation
-      if (error.cause && typeof error.cause === 'object') {
-        const cause = error.cause as any;
-        if (cause.code === '23505' && cause.constraint === 'webhooks_organization_id_path_unique') {
-          // Extract path from error details if available
-          const match = cause.detail?.match(/Key \(organization_id, path\)=\([^,]+, ([^)]+)\)/);
-          const webhookPath = match ? match[1] : 'this path';
-          error.message = `Webhook path "${webhookPath}" already exists. Please use a different path.`;
-        }
+    createContext,
+    /**
+     * @see https://trpc.io/docs/v11/error-handling
+     */
+    onError({ error }) {
+      if (error.code === "INTERNAL_SERVER_ERROR") {
+        console.error("tRPC Internal Error:", error);
       }
     },
   });
 
+  // Handle auth cookie management
   if (procedurePath === "auth.logout") {
     return clearAuthCookie(response);
   }
 
-  const clonedResponse = response.clone();
-  let responseData: unknown;
-
-  try {
-    responseData = await clonedResponse.json();
-  } catch {
-    return response;
-  }
-
-  const tokenValue = extractTokenFromResponse(responseData);
-
-  if (tokenValue && procedurePath === "auth.login") {
-    return setAuthCookie(response, tokenValue);
+  if (procedurePath === "auth.login") {
+    try {
+      const data = await response.clone().json();
+      const token = extractToken(data);
+      if (token) return setAuthCookie(response, token);
+    } catch {
+      // Ignore parse errors
+    }
   }
 
   return response;

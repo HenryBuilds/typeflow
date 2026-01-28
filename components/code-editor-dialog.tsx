@@ -632,16 +632,16 @@ export function CodeEditorDialog({
 
   // Parse type definitions to extract type names
   const definedTypes = useMemo(() => {
-    console.log('Type definitions source:', typeDefinitions ? typeDefinitions.substring(0, 100) + '...' : 'empty');
+    
     const customTypes = parseTypes(typeDefinitions || '', 'global types');
-    console.log('Parsed custom types:', customTypes.length, 'types:', customTypes.map(t => t.name).join(', '));
+    
     return customTypes;
   }, [typeDefinitions, parseTypes]);
   
   // Parse package type definitions
   const packageTypes = useMemo(() => {
     const pkgTypes = parseTypes(packageTypeDefinitions || '', 'installed packages');
-    console.log('Parsed package types:', pkgTypes.length, 'types');
+    
     return pkgTypes;
   }, [packageTypeDefinitions, parseTypes]);
   
@@ -655,7 +655,7 @@ export function CodeEditorDialog({
       return true;
     });
     
-    console.log('All types for autocomplete:', combined.length, 'types');
+    
     return combined;
   }, [definedTypes, packageTypes, standardTypes]);
 
@@ -1095,30 +1095,30 @@ ${utilities.map(util => {
           if (typeAnnotationMatch) {
             const typeName = typeAnnotationMatch[1];
 
-            console.log('Found type annotation:', typeName);
-            console.log('Available types:', allTypes.map(t => t.name).join(', '));
+            
+            
 
             // Find the type in our parsed types
             const typeInfo = allTypes.find(t => t.name === typeName);
 
-            console.log('Type info found:', typeInfo);
+            
 
             if (typeInfo && typeInfo.properties && typeInfo.properties.length > 0) {
-              console.log('Properties:', typeInfo.properties);
+              
 
               // Get already defined properties in the object
               const objectContentMatch = textBefore.match(/\{([^}]*)$/);
               const objectContent = objectContentMatch ? objectContentMatch[1] : '';
               const definedProps = objectContent.match(/(\w+)\s*:/g)?.map(p => p.replace(':', '').trim()) || [];
 
-              console.log('Defined props:', definedProps);
+              
 
               // Filter out already defined properties
               const availableProps = typeInfo.properties.filter(
                 prop => !definedProps.includes(prop.name)
               );
 
-              console.log('Available props:', availableProps);
+              
 
               if (availableProps.length > 0) {
                 const word = context.matchBefore(/\w*/);

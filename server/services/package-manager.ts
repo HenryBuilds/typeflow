@@ -143,7 +143,7 @@ export class PackageManager {
       for (const typeFile of possibleTypeFiles) {
         try {
           const content = await fs.readFile(typeFile, "utf-8");
-          console.log(`Found type definitions for ${packageName} at ${typeFile}`);
+          
           return content;
         } catch {
           // File doesn't exist, try next
@@ -155,7 +155,7 @@ export class PackageManager {
       try {
         const typeFile = path.join(typesPackagePath, "index.d.ts");
         const content = await fs.readFile(typeFile, "utf-8");
-        console.log(`Found @types definitions for ${packageName}`);
+        
         return content;
       } catch {
         // No @types package
@@ -164,11 +164,11 @@ export class PackageManager {
       // Try fallback type definitions
       const fallback = getPackageTypeFallback(packageName);
       if (fallback) {
-        console.log(`Using fallback type definitions for ${packageName}`);
+        
         return fallback;
       }
 
-      console.log(`No type definitions found for ${packageName}`);
+      
       return null;
     } catch (error) {
       console.error(`Error extracting type definitions for ${packageName}:`, error);
@@ -192,7 +192,7 @@ export class PackageManager {
       // Install package
       const packageSpec = version ? `${packageName}@${version}` : packageName;
       
-      console.log(`Installing ${packageSpec} for org ${organizationId}...`);
+      
       
       const { stdout, stderr } = await execAsync(
         `npm install ${packageSpec} --save --production`,
@@ -202,19 +202,19 @@ export class PackageManager {
         }
       );
 
-      console.log("NPM stdout:", stdout);
-      if (stderr) console.log("NPM stderr:", stderr);
+      
+      if (stderr) 
 
       // Try to install @types if available
       try {
-        console.log(`Attempting to install @types/${packageName}...`);
+        
         await execAsync(`npm install @types/${packageName} --save-dev`, {
           cwd: orgPath,
           maxBuffer: 1024 * 1024 * 10,
         });
-        console.log(`Installed @types/${packageName}`);
+        
       } catch {
-        console.log(`No @types package available for ${packageName}`);
+        
       }
 
       // Get installed package info
@@ -298,7 +298,7 @@ export class PackageManager {
       }
 
       // Uninstall package
-      console.log(`Uninstalling ${packageName} for org ${organizationId}...`);
+      
       
       await execAsync(`npm uninstall ${packageName}`, {
         cwd: orgPath,

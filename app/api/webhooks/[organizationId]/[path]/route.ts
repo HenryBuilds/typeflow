@@ -57,9 +57,9 @@ async function handleWebhookRequest(
   try {
     const { organizationId, path } = params;
 
-    console.log(`Webhook request received: ${method} ${organizationId}/${path}`);
+    
 
-    console.log(`Searching for webhook: OrgID=${organizationId}, Path=${path}`);
+    
 
     // Find webhook by organization and path (first without isActive check to provide better error messages)
     const webhook = await db.query.webhooks.findFirst({
@@ -226,7 +226,7 @@ async function handleWebhookRequest(
       contentType,
     };
 
-    console.log("Trigger data:", JSON.stringify(triggerData, null, 2));
+    
 
     // Save request to database for listening mode
     try {
@@ -240,7 +240,7 @@ async function handleWebhookRequest(
         rawBody: rawBody || undefined,
         url: url.toString(),
       });
-      console.log("Webhook request saved to database with all data");
+      
     } catch (error) {
       console.error("Error saving webhook request:", error);
       // Continue even if saving fails
@@ -258,7 +258,7 @@ async function handleWebhookRequest(
           webhookPath: path,
         });
 
-        console.log(`[WEBHOOK] Workflow queued with job ID: ${job.id}`);
+        
 
         return NextResponse.json(
           {
@@ -305,7 +305,7 @@ async function handleWebhookRequest(
       triggerData
     );
 
-    console.log("Workflow execution result:", result);
+    
 
     // Check if workflow execution failed
     const hasFailed = Object.values(result.nodeResults || {}).some(

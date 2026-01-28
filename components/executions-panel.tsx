@@ -175,7 +175,7 @@ export function ExecutionsPanel({ workflowId, organizationId, selectedExecutionI
                         error?: string;
                         duration?: number;
                       }>;
-                      console.log("Selected execution:", execution.id, "nodeResults:", nodeResults);
+                      
                       onSelectExecution(execution.id, nodeResults);
                     }
                   }}

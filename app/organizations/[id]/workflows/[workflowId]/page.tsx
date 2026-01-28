@@ -187,7 +187,7 @@ export default function WorkflowEditorPage() {
       },
       {
         onSuccess: (result) => {
-          console.log("Node execution result:", result);
+          
           const isSuccess = result.status === "completed";
           addLog({ 
             level: isSuccess ? "success" : "error", 
@@ -275,7 +275,7 @@ export default function WorkflowEditorPage() {
       },
       {
         onSuccess: (result) => {
-          console.log("Test flow execution result:", result);
+          
           
           // Check if execution was successful by checking status
           const isSuccess = result.status === "completed";
@@ -323,7 +323,7 @@ export default function WorkflowEditorPage() {
                 duration: nodeResult.duration,
               };
             });
-            console.log("Formatted outputs:", formattedOutputs);
+            
             setNodeOutputs(formattedOutputs);
           }
           setExecutingNodeId(null);
@@ -340,19 +340,19 @@ export default function WorkflowEditorPage() {
   const handleSaveTypeDefinitions = useCallback(async (types: string) => {
     if (!workflow) return;
 
-    console.log('handleSaveTypeDefinitions called');
-    console.log('Received types parameter:', typeof types, 'length:', types?.length);
-    console.log('Received types content preview:', types ? types.substring(0, 200) : 'UNDEFINED OR NULL');
-    console.log('Saving type definitions:', types ? types.substring(0, 100) + '...' : 'EMPTY');
+    
+    
+    
+    
 
     const updatedMetadata = {
       ...workflow.metadata,
       typeDefinitions: types,
     };
 
-    console.log('Current workflow.metadata:', workflow.metadata);
-    console.log('Updated metadata:', updatedMetadata);
-    console.log('Updated metadata.typeDefinitions length:', updatedMetadata.typeDefinitions?.length);
+    
+    
+    
 
     return new Promise<void>((resolve, reject) => {
       saveMutation.mutate(
@@ -383,7 +383,7 @@ export default function WorkflowEditorPage() {
         },
         {
           onSuccess: async () => {
-            console.log('Type definitions saved successfully, refreshing data...');
+            
             resolve();
           },
           onError: (error) => {
@@ -625,14 +625,14 @@ export default function WorkflowEditorPage() {
     const currentEdges = getEdgesRef.current?.() || [];
     
     console.group('🐛 Workflow Debug State');
-    console.log('Workflow:', workflow);
-    console.log('Nodes:', currentNodes);
-    console.log('Edges:', currentEdges);
-    console.log('Node Outputs:', nodeOutputs);
-    console.log('Selected Node:', selectedNodeId);
-    console.log('Executing Node:', executingNodeId);
-    console.log('Workflow Logs:', workflowLogs);
-    console.log('Installed Packages:', installedPackages);
+    
+    
+    
+    
+    
+    
+    
+    
     console.groupEnd();
   }, [workflow, getNodesRef, getEdgesRef, nodeOutputs, selectedNodeId, executingNodeId, workflowLogs, installedPackages]);
 
@@ -863,9 +863,9 @@ export default function WorkflowEditorPage() {
                 if (executionMode === "debug") {
                   // Start debug session
                   try {
-                    console.log('[Debug] Starting debug session...');
+                    
                     await startDebug();
-                    console.log('[Debug] Debug session started successfully');
+                    
                     setRightSidebarOpen(true);
                   } catch (error) {
                     console.error('[Debug] Failed to start debug session:', error);
@@ -883,8 +883,8 @@ export default function WorkflowEditorPage() {
                       },
                       {
                         onSuccess: (result) => {
-                          console.log("Execution result received:", result);
-                          console.log("Node results:", result.nodeResults);
+                          
+                          
                           
                           const isSuccess = result.status === "completed";
                           addLog({ 
@@ -931,7 +931,7 @@ export default function WorkflowEditorPage() {
                                 duration: nodeResult.duration,
                               };
                             });
-                            console.log("Formatted outputs:", formattedOutputs);
+                            
                             setNodeOutputs(formattedOutputs);
                           }
                           if (result.status !== "completed") {
@@ -1032,8 +1032,8 @@ export default function WorkflowEditorPage() {
             <div className="flex-1 overflow-hidden">
               {selectedExecutionId && executionNodeOutputs ? (
                 <>
-                  {console.log("Rendering WorkflowEditor with executionNodeOutputs:", executionNodeOutputs)}
-                  {console.log("Workflow nodes:", workflow?.nodes?.map(n => ({ id: n.id, label: n.label })))}
+                  {}
+                  {}
                 <WorkflowEditor
                   organizationId={organizationId}
                   workflow={workflow as any}
@@ -1577,9 +1577,9 @@ export default function WorkflowEditorPage() {
                   currentNodeId={debugCurrentNodeId}
                   onStartDebug={async () => {
                     try {
-                      console.log('[Debug] Starting debug session...');
+                      
                       await startDebug();
-                      console.log('[Debug] Debug session started successfully');
+                      
                       // Auto-open right sidebar to show debug panel
                       setRightSidebarOpen(true);
                     } catch (error) {
@@ -1610,8 +1610,8 @@ export default function WorkflowEditorPage() {
                 executingNodeId={executingNodeId}
                 typeDefinitions={(() => {
                   const typeDefs = (workflow?.metadata as { typeDefinitions?: string })?.typeDefinitions;
-                  console.log('WorkflowEditorPage - Type Definitions being passed:', typeDefs ? typeDefs.substring(0, 100) + '...' : 'empty/undefined');
-                  console.log('WorkflowEditorPage - Full metadata:', workflow?.metadata);
+                  
+                  
                   return typeDefs;
                 })()}
                 packageTypeDefinitions={installedPackages?.map(pkg => pkg.typeDefinitions).filter(Boolean).join('\n\n')}

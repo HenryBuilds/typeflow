@@ -186,7 +186,7 @@ export function WorkflowEditor({
 }: WorkflowEditorProps) {
   // Debug logging
   useEffect(() => {
-    console.log('WorkflowEditor received typeDefinitions:', typeDefinitions ? typeDefinitions.substring(0, 100) + '...' : 'empty/undefined');
+    
   }, [typeDefinitions]);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] =
@@ -399,7 +399,7 @@ export function WorkflowEditor({
 
       // Debug: Log node ID matching
       if (nodeOutputs && Object.keys(nodeOutputs).length > 0) {
-        console.log(`Node "${node.data?.label}" (${node.id}): executionStatus=${executionStatus}, nodeOutputs keys=`, Object.keys(nodeOutputs));
+        
       }
 
       if (node.type === "code") {

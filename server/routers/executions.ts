@@ -9,6 +9,9 @@ import {
   type ExecutionStatus,
 } from "@/db/schema/executions";
 import { workflowExecutor } from "../services/workflow-executor";
+import { addWorkflowJob, getJobStatus } from "@/lib/queue/workflow-queue";
+
+const ENABLE_QUEUE = process.env.ENABLE_WORKER_QUEUE === "true";
 
 export const executionsRouter = router({
   // List executions for organization
@@ -256,7 +259,47 @@ export const executionsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Create execution record
+      // NOTE: Queue disabled for manual executions to keep UI responsive
+      // Manual executions need sync response with nodeResults for UI display
+      // Queue is only used for webhooks (see app/api/webhooks/[organizationId]/[path]/route.ts)
+      
+      // Queue-based execution (async) - DISABLED FOR MANUAL RUNS
+      // if (ENABLE_QUEUE) {
+      //   try {
+      //     const job = await addWorkflowJob({
+      //       workflowId: input.workflowId,
+      //       organizationId: ctx.organization.id,
+      //       trigger: "manual",
+      //       input: input.triggerData,
+      //       userId: ctx.userId,
+      //     });
+      //
+      //     
+      //
+      //     // Create execution record with queued status
+      //     const [execution] = await db
+      //       .insert(executions)
+      //       .values({
+      //         organizationId: ctx.organization.id,
+      //         workflowId: input.workflowId,
+      //         triggerType: "manual",
+      //         triggerData: input.triggerData,
+      //         status: "pending",
+      //       })
+      //       .returning();
+      //
+      //     return {
+      //       ...execution,
+      //       jobId: job.id,
+      //       queued: true,
+      //     };
+      //   } catch (error) {
+      //     console.error("Error queuing workflow:", error);
+      //     // Fall through to direct execution on queue error
+      //   }
+      // }
+
+      // Direct execution (sync) - used for manual runs to provide immediate feedback
       const [execution] = await db
         .insert(executions)
         .values({
@@ -278,11 +321,7 @@ export const executionsRouter = router({
         );
 
         // Update execution with results
-        console.log("Workflow execution completed:", {
-          success: result.success,
-          nodeResults: result.nodeResults,
-          finalOutput: result.finalOutput,
-        });
+        
 
         const now = new Date();
         const [updated] = await db

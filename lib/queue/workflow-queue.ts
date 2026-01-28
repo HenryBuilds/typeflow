@@ -52,7 +52,7 @@ export async function addWorkflowJob(
     delay: options?.delay,
   });
 
-  console.log(`[QUEUE] Queued workflow job ${job.id} for workflow ${data.workflowId}`);
+  
 
   return job;
 }
@@ -123,7 +123,7 @@ export async function cleanQueue(
   const queue = getWorkflowQueue();
   await queue.clean(grace, 1000, "completed");
   await queue.clean(grace * 7, 1000, "failed");
-  console.log("[QUEUE] Queue cleaned");
+  
 }
 
 export async function closeQueue(): Promise<void> {

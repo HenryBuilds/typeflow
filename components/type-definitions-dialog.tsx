@@ -60,7 +60,7 @@ type ApiResponse<T> = {
 
   useEffect(() => {
     if (open) {
-      console.log('Type Definitions Dialog opened with initialTypes:', initialTypes ? initialTypes.substring(0, 100) + '...' : 'empty/undefined');
+      
       // Use initialTypes if provided, otherwise use default template
       setTypes(initialTypes || defaultTemplate);
       setIsSaving(false); // Reset saving state when dialog opens
@@ -127,10 +127,10 @@ type ApiResponse<T> = {
   }, []);
 
   const handleSave = async () => {
-    console.log('Dialog handleSave called');
-    console.log('Current types state length:', types.length);
-    console.log('Current types state preview:', types.substring(0, 200));
-    console.log('Saving type definitions from dialog:', types ? types.substring(0, 100) + '...' : 'EMPTY OR UNDEFINED');
+    
+    
+    
+    
     
     if (!types || types.trim() === '') {
       console.error('Types are empty! Not saving.');
@@ -141,7 +141,7 @@ type ApiResponse<T> = {
     setIsSaving(true);
     try {
       await onSave(types);
-      console.log('Type definitions saved successfully, closing dialog');
+      
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to save type definitions:', error);
@@ -177,7 +177,7 @@ type ApiResponse<T> = {
               ]}
               theme={vscodeDark}
               onChange={(value) => {
-                console.log('CodeMirror onChange called, new value length:', value.length);
+                
                 setTypes(value);
               }}
               basicSetup={{

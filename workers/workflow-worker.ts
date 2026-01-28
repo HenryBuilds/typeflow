@@ -6,7 +6,7 @@ import { WorkflowExecutor } from "../server/services/workflow-executor";
 const QUEUE_NAME = "workflow-queue";
 const CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || "5", 10);
 
-console.log(`[WORKER] Starting Typeflow Worker (concurrency: ${CONCURRENCY})`);
+
 
 const executor = new WorkflowExecutor();
 
@@ -15,9 +15,7 @@ async function processWorkflowJob(
 ): Promise<WorkflowJobResult> {
   const { workflowId, organizationId, trigger, input, userId } = job.data;
 
-  console.log(
-    `[WORKER] Processing job ${job.id}: workflow=${workflowId}, trigger=${trigger}`
-  );
+  
 
   const startTime = Date.now();
 
@@ -44,7 +42,7 @@ async function processWorkflowJob(
       };
     }
 
-    console.log(`[WORKER] Job ${job.id} completed in ${executionTime}ms`);
+    
 
     // Convert finalOutput array to object for consistency
     const outputs = Array.isArray(result.finalOutput)
@@ -89,7 +87,7 @@ const worker = new Worker<WorkflowJobData, WorkflowJobResult>(
 
 // Worker event handlers
 worker.on("completed", (job) => {
-  console.log(`[WORKER] Job ${job.id} completed successfully`);
+  
 });
 
 worker.on("failed", (job, error) => {
@@ -101,19 +99,19 @@ worker.on("error", (error) => {
 });
 
 worker.on("ready", () => {
-  console.log("[WORKER] Worker is ready and waiting for jobs");
+  
 });
 
 // Graceful shutdown
 async function gracefulShutdown(signal: string) {
-  console.log(`\n[WORKER] Received ${signal}, shutting down gracefully...`);
+  
 
   try {
     await worker.close();
-    console.log("[WORKER] Worker closed");
+    
 
     await closeRedisConnection();
-    console.log("[WORKER] Redis connection closed");
+    
 
     process.exit(0);
   } catch (error) {
@@ -125,4 +123,4 @@ async function gracefulShutdown(signal: string) {
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
-console.log("[WORKER] Worker started successfully");
+
