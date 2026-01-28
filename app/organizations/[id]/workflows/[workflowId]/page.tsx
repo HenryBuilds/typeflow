@@ -993,15 +993,6 @@ export default function WorkflowEditorPage() {
           </DropdownMenu>
           </div>
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setDebugStateDialogOpen(true)}
-            title="View Workflow State"
-            className="px-2"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
             variant="default"
             size="sm"
             onClick={handleSave}
