@@ -30,18 +30,21 @@ export const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNode
   // Determine border and background color based on execution status
   const getStatusStyles = () => {
     if (data.executionStatus === "completed") {
-      return "border-green-500 bg-green-50 dark:bg-green-950/20";
+      return "node-card-completed";
     }
     if (data.executionStatus === "failed") {
-      return "border-red-500 bg-red-50 dark:bg-red-950/20";
+      return "node-card-failed";
     }
     if (data.executionStatus === "running" || data.isExecuting) {
-      return "border-blue-500 bg-blue-50 dark:bg-blue-950/20 animate-pulse";
+      return "node-card-running";
+    }
+    if (data.isBreakpointActive) {
+      return "border-yellow-400 dark:border-yellow-500 bg-yellow-50/80 dark:bg-yellow-950/40 shadow-lg shadow-yellow-500/20 ring-2 ring-yellow-400/30";
     }
     if (selected) {
-      return "border-blue-500 bg-white dark:bg-gray-800";
+      return "node-card-selected";
     }
-    return "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800";
+    return "node-card";
   };
 
   const getStatusIcon = () => {
@@ -74,7 +77,7 @@ export const WorkflowNode = memo(({ data, selected, id }: NodeProps<WorkflowNode
   return (
     <NodeWrapper nodeId={id} hasBreakpoint={data.hasBreakpoint} isBreakpointActive={data.isBreakpointActive} onToggleBreakpoint={data.onToggleBreakpoint}>
       <div
-        className={`px-4 py-2 shadow-md rounded-md border-2 transition-all duration-200 ${getStatusStyles()}`}
+        className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 ${getStatusStyles()}`}
       >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">

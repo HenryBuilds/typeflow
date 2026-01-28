@@ -73,21 +73,21 @@ export const CodeNode = memo(({ data, selected, id }: NodeProps<CodeNodeData>) =
   // Determine border and background color based on execution status
   const getStatusStyles = () => {
     if (data.executionStatus === "completed") {
-      return "border-green-400 dark:border-green-500 bg-green-50/80 dark:bg-green-950/40 shadow-md shadow-green-500/10";
+      return "node-card-completed";
     }
     if (data.executionStatus === "failed") {
-      return "border-red-400 dark:border-red-500 bg-red-50/80 dark:bg-red-950/40 shadow-md shadow-red-500/10";
+      return "node-card-failed";
     }
     if (data.executionStatus === "running" || data.isExecuting) {
-      return "border-blue-400 dark:border-blue-500 bg-blue-50/80 dark:bg-blue-950/40 shadow-lg shadow-blue-500/20 animate-pulse";
+      return "node-card-running";
     }
     if (data.isBreakpointActive) {
       return "border-yellow-400 dark:border-yellow-500 bg-yellow-50/80 dark:bg-yellow-950/40 shadow-lg shadow-yellow-500/20 ring-2 ring-yellow-400/30";
     }
     if (selected) {
-      return "border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-950/30 shadow-lg shadow-blue-500/10 ring-2 ring-blue-400/20";
+      return "node-card-selected";
     }
-    return "border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-800/95 hover:border-gray-300 dark:hover:border-gray-600";
+    return "node-card";
   };
 
   const getStatusIcon = () => {
@@ -119,7 +119,7 @@ export const CodeNode = memo(({ data, selected, id }: NodeProps<CodeNodeData>) =
 
   return (
     <div
-      className={`px-4 py-2.5 shadow-sm hover:shadow-md rounded-lg border cursor-pointer transition-all duration-300 relative backdrop-blur-sm ${getStatusStyles()}`}
+      className={`px-4 py-2.5 rounded-lg border-2 cursor-pointer transition-all duration-300 relative ${getStatusStyles()}`}
       onDoubleClick={handleDoubleClick}
       title="Double-click to edit code"
     >
