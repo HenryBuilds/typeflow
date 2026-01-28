@@ -56,8 +56,12 @@ GET /api/jobs/{jobId}
 
 ## Preview
 
-![Preview 1](preview_4.png)
+![Type-Safe Development](typesafe.png)
 
-![Preview 2](preview_5.png)
+![TypeScript Type Definitions](types.png)
 
-![Preview 3](preview_6.png)
+![NPM Package Management](packages.png)
+
+![Workflow Editor Overview](overview.png)
+
+![Visual Debugging](debugging.png)

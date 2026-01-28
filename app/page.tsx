@@ -29,7 +29,7 @@ export default function LandingPage() {
   useEffect(() => {
     setIsVisible(true);
     const interval = setInterval(() => {
-      setActivePreview((prev) => (prev + 1) % 3);
+      setActivePreview((prev) => (prev + 1) % 5);
     }, 5000);
     
     const handleScroll = () => setScrollY(window.scrollY);
@@ -75,9 +75,11 @@ export default function LandingPage() {
   ];
 
   const previews = [
-    { src: "/preview_4.png", alt: "Workflow Editor" },
-    { src: "/preview_5.png", alt: "Visual Debugging" },
-    { src: "/preview_6.png", alt: "Node Configuration" }
+    { src: "/typesafe.png", alt: "Type-Safe Workflow Development" },
+    { src: "/types.png", alt: "TypeScript Type Definitions" },
+    { src: "/packages.png", alt: "NPM Package Management" },
+    { src: "/overview.png", alt: "Workflow Editor Overview" },
+    { src: "/debugging.png", alt: "Visual Debugging with Breakpoints" }
   ];
 
   return (
@@ -210,8 +212,10 @@ export default function LandingPage() {
                         src={preview.src}
                         alt={preview.alt}
                         fill
-                        className="object-cover object-top"
+                        className={preview.src === '/typesafe.png' ? 'object-contain' : 'object-cover object-top'}
                         priority={index === 0}
+                        quality={100}
+                        unoptimized
                       />
                     </div>
                   ))}
