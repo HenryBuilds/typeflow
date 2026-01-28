@@ -14,6 +14,7 @@ export const webhooks = pgTable(
       .references(() => workflows.id, { onDelete: "cascade" }),
     path: text("path").notNull(), // e.g., '/webhook/abc123'
     method: text("method").default("POST").notNull(), // 'GET', 'POST', 'PUT', etc.
+    responseMode: text("response_mode").default("waitForResult").notNull(), // 'waitForResult' | 'respondImmediately'
     isActive: boolean("is_active").default(true).notNull(),
     // Authentication/authorization
     authType: text("auth_type"), // 'none', 'api_key', 'bearer', 'basic'
