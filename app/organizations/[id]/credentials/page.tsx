@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { trpc } from "@/lib/trpc";
+import { useCredentials, useDeleteCredential } from "@/hooks/use-credentials";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Plus, Database, Trash2, Edit } from "lucide-react";
@@ -14,17 +14,9 @@ export default function CredentialsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCredential, setEditingCredential] = useState<string | null>(null);
 
-  const { data: credentials, isLoading } = trpc.credentials.list.useQuery({
-    organizationId,
-  });
+  const { data: credentials, isLoading } = useCredentials(organizationId);
 
-  const deleteMutation = trpc.credentials.delete.useMutation({
-    onSuccess: () => {
-      utils.credentials.list.invalidate({ organizationId });
-    },
-  });
-
-  const utils = trpc.useUtils();
+  const deleteMutation = useDeleteCredential(organizationId);
 
   const handleDelete = async (credentialId: string) => {
     if (confirm("Are you sure you want to delete this credential?")) {

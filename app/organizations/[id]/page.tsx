@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { trpc } from "@/lib/trpc";
+import { useOrganization, useOrganizationMembers } from "@/hooks/use-organizations";
+import { useWorkflows } from "@/hooks/use-workflows";
+import { useCredentials } from "@/hooks/use-credentials";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,36 +26,16 @@ export default function OrganizationDetailPage() {
     data: organization,
     isLoading: isLoadingOrg,
     error: orgError,
-  } = trpc.organizations.getById.useQuery(
-    { id },
-    {
-      enabled: !!id,
-    }
-  );
+  } = useOrganization(id);
 
   const { data: members, isLoading: isLoadingMembers } =
-    trpc.organizations.getMembers.useQuery(
-      { organizationId: id },
-      {
-        enabled: !!id && !!organization,
-      }
-    );
+    useOrganizationMembers(id);
 
   const { data: workflows, isLoading: isLoadingWorkflows } =
-    trpc.workflows.list.useQuery(
-      { organizationId: id },
-      {
-        enabled: !!id && !!organization,
-      }
-    );
+    useWorkflows(id);
 
   const { data: credentials, isLoading: isLoadingCredentials } =
-    trpc.credentials.list.useQuery(
-      { organizationId: id },
-      {
-        enabled: !!id && !!organization,
-      }
-    );
+    useCredentials(id);
 
   useEffect(() => {
     if (orgError?.data?.code === "UNAUTHORIZED") {

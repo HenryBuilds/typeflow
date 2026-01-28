@@ -1,6 +1,25 @@
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc";
 
+export function useWorkflows(organizationId: string) {
+  return trpc.workflows.list.useQuery(
+    { organizationId },
+    {
+      enabled: !!organizationId,
+    }
+  );
+}
+
+export function useWorkflow(organizationId: string, id: string) {
+  return trpc.workflows.getById.useQuery(
+    { organizationId, id },
+    {
+      enabled: !!organizationId && !!id,
+      retry: false,
+    }
+  );
+}
+
 export function useCreateWorkflow(organizationId: string) {
   const router = useRouter();
   const utils = trpc.useUtils();

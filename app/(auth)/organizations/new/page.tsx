@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { trpc } from "@/lib/trpc";
+import { useCreateOrganization, useCheckSlugAvailability } from "@/hooks/use-organizations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,27 +22,10 @@ export default function NewOrganizationPage() {
   const [error, setError] = useState("");
   const [debouncedSlug, setDebouncedSlug] = useState("");
 
-  const utils = trpc.useUtils();
-
-  const createMutation = trpc.organizations.create.useMutation({
-    onSuccess: async (org) => {
-      await utils.organizations.list.invalidate();
-      await utils.organizations.getById.invalidate({ id: org.id });
-      router.push(`/organizations/${org.id}`);
-    },
-    onError: (err) => {
-      setError(err.message);
-    },
-  });
+  const createMutation = useCreateOrganization();
 
   const { data: slugAvailability, isLoading: isCheckingSlug } =
-    trpc.organizations.checkSlugAvailability.useQuery(
-      { slug: debouncedSlug },
-      {
-        enabled: debouncedSlug.length > 0,
-        retry: false,
-      }
-    );
+    useCheckSlugAvailability(debouncedSlug);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -81,11 +64,18 @@ export default function NewOrganizationPage() {
       return;
     }
 
-    createMutation.mutate({
-      name,
-      slug,
-      description: description || undefined,
-    });
+    createMutation.mutate(
+      {
+        name,
+        slug,
+        description: description || undefined,
+      },
+      {
+        onError: (err) => {
+          setError(err.message);
+        },
+      }
+    );
   };
 
   return (

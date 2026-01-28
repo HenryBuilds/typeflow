@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { trpc } from "@/lib/trpc";
+import { useOrganizations } from "@/hooks/use-organizations";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,7 +21,7 @@ export default function OrganizationsPage() {
     data: organizations,
     isLoading,
     error,
-  } = trpc.organizations.list.useQuery();
+  } = useOrganizations();
 
   useEffect(() => {
     if (error?.data?.code === "UNAUTHORIZED") {

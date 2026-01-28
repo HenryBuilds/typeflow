@@ -3,7 +3,6 @@
 import { useEffect, useCallback, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
@@ -29,7 +28,9 @@ import {
   EditFieldsNodeDialog,
   HttpRequestNodeDialog,
 } from "@/components/nodes/dialogs";
-import { useSaveWorkflow } from "@/hooks/use-workflows";
+import { useSaveWorkflow, useWorkflow, useUpdateWorkflow } from "@/hooks/use-workflows";
+import { usePackages } from "@/hooks/use-packages";
+import { useRunWorkflow, useRunWorkflowUntilNode } from "@/hooks/use-executions";
 import { DebugToolbar } from "@/components/debug-toolbar";
 import { DebugPanel } from "@/components/debug-panel";
 import { useDebug } from "@/hooks/use-debug";
@@ -45,19 +46,10 @@ export default function WorkflowEditorPage() {
     data: workflow,
     isLoading,
     error,
-  } = trpc.workflows.getById.useQuery(
-    { organizationId: organizationId, id: workflowId },
-    {
-      enabled: !!workflowId && !!organizationId,
-      retry: false,
-    }
-  );
+  } = useWorkflow(organizationId, workflowId);
 
   // Get installed packages for type definitions
-  const { data: installedPackages } = trpc.packages.list.useQuery(
-    { organizationId },
-    { enabled: !!organizationId }
-  );
+  const { data: installedPackages } = usePackages(organizationId);
 
   const [editorData, setEditorData] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -137,12 +129,11 @@ export default function WorkflowEditorPage() {
   };
 
   const saveMutation = useSaveWorkflow(organizationId);
-  const runMutation = trpc.executions.run.useMutation();
-  const runUntilNodeMutation = trpc.executions.runUntilNode.useMutation();
-  const updateWorkflowMutation = trpc.workflows.update.useMutation();
+  const runMutation = useRunWorkflow();
+  const runUntilNodeMutation = useRunWorkflowUntilNode();
+  const updateWorkflowMutation = useUpdateWorkflow(organizationId);
   const getNodesRef = useRef<(() => Node[]) | null>(null);
   const getEdgesRef = useRef<(() => Edge[]) | null>(null);
-  const utils = trpc.useUtils();
 
   // Debug hook
   const {
@@ -378,9 +369,6 @@ export default function WorkflowEditorPage() {
         {
           onSuccess: async () => {
             console.log('Type definitions saved successfully, refreshing data...');
-            await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
-            await utils.workflows.getById.refetch({ organizationId, id: workflowId });
-            console.log('Refreshed workflow data');
             resolve();
           },
           onError: (error) => {
@@ -391,7 +379,7 @@ export default function WorkflowEditorPage() {
         }
       );
     });
-  }, [workflow, saveMutation, organizationId, workflowId, utils]);
+  }, [workflow, saveMutation, organizationId, workflowId]);
 
   const handleToggleActive = useCallback(() => {
     if (!workflow) return;
@@ -410,8 +398,6 @@ export default function WorkflowEditorPage() {
             level: "info",
             message: `Workflow ${newActiveState ? "activated" : "deactivated"}`,
           });
-          await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
-          await utils.workflows.getById.refetch({ organizationId, id: workflowId });
         },
         onError: (error) => {
           console.error("Error toggling workflow active state:", error);
@@ -419,7 +405,7 @@ export default function WorkflowEditorPage() {
         },
       }
     );
-  }, [workflow, updateWorkflowMutation, organizationId, workflowId, utils, addLog]);
+  }, [workflow, updateWorkflowMutation, organizationId, workflowId, addLog]);
 
   const handleSave = useCallback(() => {
     if (!workflow) {
@@ -459,8 +445,6 @@ export default function WorkflowEditorPage() {
       {
         onSuccess: async () => {
           // Invalidate and refetch workflow data to show updated nodes
-          await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
-          await utils.workflows.getById.refetch({ organizationId, id: workflowId });
         },
         onError: (error) => {
           console.error("Error saving workflow:", error);
@@ -1775,8 +1759,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
-                  await utils.workflows.getById.refetch({ organizationId, id: workflowId });
+
                   setWebhookDialogOpen(false);
                   setEditingWebhookNode(null);
                 },
@@ -1851,8 +1834,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
-                  await utils.workflows.getById.refetch({ organizationId, id: workflowId });
+
                   setExecuteWorkflowDialogOpen(false);
                   setEditingExecuteWorkflowNode(null);
                 },
@@ -1923,8 +1905,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
-                  await utils.workflows.getById.refetch({ organizationId, id: workflowId });
+
                   setWorkflowInputDialogOpen(false);
                   setEditingWorkflowInputNode(null);
                 },
@@ -1996,8 +1977,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
-                  await utils.workflows.getById.refetch({ organizationId, id: workflowId });
+
                   setWorkflowOutputDialogOpen(false);
                   setEditingWorkflowOutputNode(null);
                 },
@@ -2040,7 +2020,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setFilterDialogOpen(false);
                   setEditingFilterNode(null);
                 },
@@ -2079,7 +2059,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setLimitDialogOpen(false);
                   setEditingLimitNode(null);
                 },
@@ -2118,7 +2098,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setWaitDialogOpen(false);
                   setEditingWaitNode(null);
                 },
@@ -2157,7 +2137,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setDateTimeDialogOpen(false);
                   setEditingDateTimeNode(null);
                 },
@@ -2196,7 +2176,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setAggregateDialogOpen(false);
                   setEditingAggregateNode(null);
                 },
@@ -2235,7 +2215,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setMergeDialogOpen(false);
                   setEditingMergeNode(null);
                 },
@@ -2274,7 +2254,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setSplitOutDialogOpen(false);
                   setEditingSplitOutNode(null);
                 },
@@ -2313,7 +2293,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setRemoveDuplicatesDialogOpen(false);
                   setEditingRemoveDuplicatesNode(null);
                 },
@@ -2352,7 +2332,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setSummarizeDialogOpen(false);
                   setEditingSummarizeNode(null);
                 },
@@ -2391,7 +2371,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setEditFieldsDialogOpen(false);
                   setEditingEditFieldsNode(null);
                 },
@@ -2430,7 +2410,7 @@ export default function WorkflowEditorPage() {
               },
               {
                 onSuccess: async () => {
-                  await utils.workflows.getById.invalidate({ organizationId, id: workflowId });
+
                   setHttpRequestDialogOpen(false);
                   setEditingHttpRequestNode(null);
                 },
