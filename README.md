@@ -56,12 +56,12 @@ GET /api/jobs/{jobId}
 
 ## Preview
 
-![Type-Safe Development](typesafe.png)
+![Type-Safe Development](public/typesafe.png)
 
-![TypeScript Type Definitions](types.png)
+![TypeScript Type Definitions](public/types.png)
 
-![NPM Package Management](packages.png)
+![NPM Package Management](public/packages.png)
 
-![Workflow Editor Overview](overview.png)
+![Workflow Editor Overview](public/overview.png)
 
-![Visual Debugging](debugging.png)
+![Visual Debugging](public/debugging.png)
