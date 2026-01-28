@@ -235,6 +235,7 @@ export function WorkflowEditor({
       if (sourceStatus === "completed" && targetStatus === "completed") {
         return {
           ...edge,
+          type: 'deletable',
           animated: true,
           style: { stroke: '#22c55e', strokeWidth: 2 },
         };
@@ -244,6 +245,7 @@ export function WorkflowEditor({
       if (sourceStatus === "completed" && targetStatus === "running") {
         return {
           ...edge,
+          type: 'deletable',
           animated: true,
           style: { stroke: '#3b82f6', strokeWidth: 2 },
         };
@@ -253,6 +255,7 @@ export function WorkflowEditor({
       if (sourceStatus === "completed") {
         return {
           ...edge,
+          type: 'deletable',
           style: { stroke: '#22c55e', strokeWidth: 2 },
         };
       }
@@ -261,11 +264,15 @@ export function WorkflowEditor({
       if (sourceStatus === "failed" || targetStatus === "failed") {
         return {
           ...edge,
+          type: 'deletable',
           style: { stroke: '#ef4444', strokeWidth: 2 },
         };
       }
       
-      return edge;
+      return {
+        ...edge,
+        type: 'deletable',
+      };
     });
   }, [edges, nodeOutputs]);
 
@@ -1041,7 +1048,6 @@ export function WorkflowEditor({
           }}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          fitView
           className="bg-background"
         >
           <Controls />

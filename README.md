@@ -4,8 +4,8 @@ A visual workflow automation platform built with Next.js. Focus on typescript / 
 
 ## Preview
 
-![Preview 1](preview_1.png)
+![Preview 1](preview_4.png)
 
-![Preview 2](preview_2.png)
+![Preview 2](preview_5.png)
 
-![Preview 3](preview_3.png)
+![Preview 3](preview_6.png)

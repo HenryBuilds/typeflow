@@ -66,13 +66,13 @@ export function DeletableEdge({
           <Button
             variant="ghost"
             size="icon"
-            className={`h-4 w-4 rounded-full bg-gray-50 hover:bg-gray-100 border border-gray-200 transition-opacity ${
-              isHovered ? "opacity-100" : "opacity-0"
+            className={`h-6 w-6 rounded-full bg-red-50 hover:bg-red-100 dark:bg-red-950 dark:hover:bg-red-900 border-2 border-red-300 dark:border-red-700 shadow-md transition-all duration-200 ${
+              isHovered ? "opacity-100 scale-100" : "opacity-0 scale-75"
             }`}
             onClick={onEdgeDelete}
             title="Delete connection"
           >
-            <X className="h-2.5 w-2.5 text-gray-500" />
+            <X className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
           </Button>
         </div>
       </EdgeLabelRenderer>

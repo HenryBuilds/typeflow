@@ -1,0 +1,141 @@
+{
+  "workflow": {
+    "id": "todos-workflow-001",
+    "name": "Todos Processing with Validation",
+    "description": "Fetch and validate todos using axios and zod",
+    "metadata": {
+      "breakpoints": []
+    }
+  },
+  "nodes": [
+    {
+      "id": "trigger-001",
+      "type": "trigger",
+      "position": {
+        "x": 100,
+        "y": 100
+      },
+      "data": {
+        "label": "Start",
+        "config": {}
+      },
+      "width": 170,
+      "height": 44
+    },
+    {
+      "id": "code-fetch",
+      "type": "code",
+      "position": {
+        "x": 100,
+        "y": 200
+      },
+      "data": {
+        "label": "Fetch with Axios",
+        "config": {
+          "code": "const axios = require('axios');\n\n// Fetch todos using axios\nconst response = await axios.get('https://jsonplaceholder.typicode.com/todos');\n\nreturn response.data;"
+        }
+      },
+      "width": 197,
+      "height": 68
+    },
+    {
+      "id": "code-validate",
+      "type": "code",
+      "position": {
+        "x": 100,
+        "y": 320
+      },
+      "data": {
+        "label": "Validate with Zod",
+        "config": {
+          "code": "const { z } = require('zod');\n\n// Define todo schema\nconst TodoSchema = z.object({\n  userId: z.number(),\n  id: z.number(),\n  title: z.string(),\n  completed: z.boolean()\n});\n\n// Validate each item individually\ntry {\n  const validated = TodoSchema.parse($json);\n  return {\n    ...validated,\n    _validated: true\n  };\n} catch (error) {\n  return {\n    ...$json,\n    _validated: false,\n    _error: error.message\n  };\n}"
+        }
+      },
+      "width": 197,
+      "height": 68
+    },
+    {
+      "id": "code-filter",
+      "type": "code",
+      "position": {
+        "x": 400,
+        "y": 200
+      },
+      "data": {
+        "label": "Filter Completed",
+        "config": {
+          "code": "// Only pass through completed todos that are validated\nif ($json._validated && $json.completed) {\n  return $json;\n}\nreturn null;"
+        }
+      },
+      "width": 197,
+      "height": 68
+    },
+    {
+      "id": "code-group",
+      "type": "code",
+      "position": {
+        "x": 400,
+        "y": 320
+      },
+      "data": {
+        "label": "Count by User",
+        "config": {
+          "code": "// Pass through validated items with userId for aggregation\nif ($json._validated) {\n  return {\n    userId: $json.userId,\n    todoId: $json.id,\n    title: $json.title\n  };\n}\nreturn null;"
+        }
+      },
+      "width": 197,
+      "height": 68
+    },
+    {
+      "id": "code-summary",
+      "type": "code",
+      "position": {
+        "x": 700,
+        "y": 260
+      },
+      "data": {
+        "label": "Create Summary",
+        "config": {
+          "code": "// Create summary from validated item\nif ($json._validated) {\n  return {\n    userId: $json.userId,\n    id: $json.id,\n    title: $json.title,\n    completed: $json.completed,\n    validationPassed: true\n  };\n}\nreturn null;"
+        }
+      },
+      "width": 197,
+      "height": 68
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-001",
+      "source": "trigger-001",
+      "target": "code-fetch",
+      "type": "deletable"
+    },
+    {
+      "id": "edge-002",
+      "source": "code-fetch",
+      "target": "code-validate",
+      "type": "deletable"
+    },
+    {
+      "id": "edge-003",
+      "source": "code-validate",
+      "target": "code-filter",
+      "type": "deletable"
+    },
+    {
+      "id": "edge-004",
+      "source": "code-validate",
+      "target": "code-group",
+      "type": "deletable"
+    },
+    {
+      "id": "edge-005",
+      "source": "code-validate",
+      "target": "code-summary",
+      "type": "deletable"
+    }
+  ],
+  "nodeOutputs": {},
+  "selectedNodeId": null,
+  "timestamp": "2026-01-28T16:52:18.000Z"
+}

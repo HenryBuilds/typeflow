@@ -40,7 +40,7 @@ export function WorkflowLogPanel({
   onToggleCollapse,
 }: WorkflowLogPanelProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
-  const [autoScroll, setAutoScroll] = useState(true);
+  const [autoScroll, setAutoScroll] = useState(false); // Disabled by default to prevent unwanted scrolling
 
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {

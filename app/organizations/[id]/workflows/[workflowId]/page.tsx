@@ -4,7 +4,19 @@ import { useEffect, useCallback, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -90,8 +102,10 @@ export default function WorkflowEditorPage() {
   const [httpRequestDialogOpen, setHttpRequestDialogOpen] = useState(false);
   const [editingHttpRequestNode, setEditingHttpRequestNode] = useState<Node | null>(null);
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
+  const [debugStateDialogOpen, setDebugStateDialogOpen] = useState(false);
   const [workflowLogs, setWorkflowLogs] = useState<WorkflowLog[]>([]);
   const [logPanelCollapsed, setLogPanelCollapsed] = useState(false); // Start expanded by default so it's visible
+  const [executionMode, setExecutionMode] = useState<"run" | "debug">("run"); // New state for execution mode
   const [nodeOutputs, setNodeOutputs] = useState<Record<
     string,
     {
@@ -134,6 +148,7 @@ export default function WorkflowEditorPage() {
   const updateWorkflowMutation = useUpdateWorkflow(organizationId);
   const getNodesRef = useRef<(() => Node[]) | null>(null);
   const getEdgesRef = useRef<(() => Edge[]) | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Debug hook
   const {
@@ -508,6 +523,86 @@ export default function WorkflowEditorPage() {
     URL.revokeObjectURL(url);
   }, [workflow, getNodesRef, getEdgesRef, nodeOutputs, selectedNodeId]);
 
+  const importWorkflowJSON = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const importedData = JSON.parse(content);
+
+        // Validate the imported data structure
+        if (!importedData.nodes || !Array.isArray(importedData.nodes)) {
+          alert('Invalid workflow file: missing nodes array');
+          return;
+        }
+
+        if (!importedData.edges || !Array.isArray(importedData.edges)) {
+          alert('Invalid workflow file: missing edges array');
+          return;
+        }
+
+        // Update the workflow object directly to trigger re-render
+        if (workflow) {
+          // Convert imported ReactFlow nodes back to workflow nodes format
+          const workflowNodes = importedData.nodes.map((node: any) => ({
+            id: node.id,
+            type: node.type,
+            label: node.data?.label || 'Node',
+            position: node.position,
+            config: node.data?.config || {},
+          }));
+
+          // Convert imported ReactFlow edges back to workflow connections format
+          const workflowConnections = importedData.edges.map((edge: any) => ({
+            id: edge.id,
+            sourceNodeId: edge.source,
+            targetNodeId: edge.target,
+            sourceHandle: edge.sourceHandle || null,
+            targetHandle: edge.targetHandle || null,
+          }));
+
+          // Update workflow with imported data
+          workflow.nodes = workflowNodes;
+          workflow.connections = workflowConnections;
+
+          // Force re-initialization by clearing and setting editorData
+          setEditorData(null);
+          setTimeout(() => {
+            setEditorData({
+              nodes: importedData.nodes,
+              edges: importedData.edges,
+            });
+          }, 0);
+        }
+
+        // Clear node outputs and selection
+        setNodeOutputs({});
+        setSelectedNodeId(null);
+
+        addLog({ 
+          level: 'success', 
+          message: `Imported workflow with ${importedData.nodes.length} nodes and ${importedData.edges.length} connections` 
+        });
+
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } catch (error) {
+        console.error('Import error:', error);
+        alert(`Failed to import workflow: ${error instanceof Error ? error.message : 'Invalid JSON'}`);
+      }
+    };
+    reader.readAsText(file);
+  }, [addLog, workflow]);
+
   const copyWorkflowState = useCallback(() => {
     const currentNodes = getNodesRef.current?.() || [];
     const currentEdges = getEdgesRef.current?.() || [];
@@ -540,6 +635,49 @@ export default function WorkflowEditorPage() {
     console.log('Installed Packages:', installedPackages);
     console.groupEnd();
   }, [workflow, getNodesRef, getEdgesRef, nodeOutputs, selectedNodeId, executingNodeId, workflowLogs, installedPackages]);
+
+  // Handle Ctrl+C to copy node reference
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle Ctrl+C (or Cmd+C on Mac)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        if (!selectedNodeId) return;
+        
+        // Check if we're not in an input/textarea/contenteditable
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return; // Let default copy behavior work in inputs
+        }
+        
+        // Also check if target is inside CodeMirror editor
+        if (target.closest('.cm-editor')) {
+          return; // Let CodeMirror handle it
+        }
+
+        // Get current nodes from ReactFlow
+        const currentNodes = getNodesRef.current?.() || [];
+        const selectedNode = currentNodes.find(n => n.id === selectedNodeId);
+        
+        if (selectedNode) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Create node reference in typeflow style using the node's label
+          const nodeLabel = selectedNode.data?.label || selectedNode.id;
+          const nodeReference = `{{node.${nodeLabel}}}`;
+          
+          // Copy to clipboard silently
+          navigator.clipboard.writeText(nodeReference).catch(err => {
+            console.error('Failed to copy:', err);
+          });
+        }
+      }
+    };
+
+    // Use bubble phase (default) to not interfere with input fields
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNodeId, getNodesRef]);
 
   // Initialize editorData when workflow loads
   useEffect(() => {
@@ -600,6 +738,14 @@ export default function WorkflowEditorPage() {
 
   return (
     <div className="h-screen flex flex-col">
+      {/* Hidden file input for importing workflows */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={handleFileImport}
+        className="hidden"
+      />
       <div className="border-b bg-background px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link href={`/organizations/${organizationId}`}>
@@ -681,13 +827,12 @@ export default function WorkflowEditorPage() {
           {/* Debug Tools */}
           <div className="flex items-center gap-2 border-l pl-2 ml-2">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              onClick={() => setDebugPanelOpen(!debugPanelOpen)}
-              title="Toggle Debug Panel"
+              onClick={importWorkflowJSON}
+              title="Import Workflow from JSON"
             >
-              <Bug className="h-4 w-4 mr-2" />
-              Debug
+              <Upload className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
@@ -707,88 +852,154 @@ export default function WorkflowEditorPage() {
             </Button>
           </div>
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (workflow) {
-                addLog({ level: "info", message: "Starting full workflow execution" });
-                runMutation.mutate(
-                  {
-                    organizationId: organizationId,
-                    workflowId: workflow.id,
-                    triggerData: {},
-                  },
-                  {
-                    onSuccess: (result) => {
-                      console.log("Execution result received:", result);
-                      console.log("Node results:", result.nodeResults);
-                      
-                      const isSuccess = result.status === "completed";
-                      addLog({ 
-                        level: isSuccess ? "success" : "error", 
-                        message: isSuccess ? "Workflow execution completed" : `Workflow failed: ${result.error}`,
-                      });
-                      
-                      // Update node outputs with execution results
-                      if (result.nodeResults) {
-                        // Convert nodeResults to the expected format
-                        const formattedOutputs: Record<
-                          string,
-                          {
-                            status: "pending" | "running" | "completed" | "failed";
-                            output?: unknown;
-                            error?: string;
-                            duration?: number;
-                          }
-                        > = {};
-                        Object.entries(result.nodeResults).forEach(([nodeId, nodeResult]) => {
-                          const node = workflow.nodes.find(n => n.id === nodeId);
-                          const nodeLabel = node?.label || `Node ${nodeId.substring(0, 8)}`;
-                          
-                          if (nodeResult.status === "completed") {
-                            addLog({
-                              level: "success",
-                              nodeId,
-                              nodeLabel,
-                              message: `Completed in ${nodeResult.duration}ms`,
-                            });
-                          } else if (nodeResult.status === "failed") {
-                            addLog({
-                              level: "error",
-                              nodeId,
-                              nodeLabel,
-                              message: nodeResult.error || "Unknown error",
-                            });
-                          }
-                          
-                          formattedOutputs[nodeId] = {
-                            status: nodeResult.status,
-                            output: nodeResult.output,
-                            error: nodeResult.error,
-                            duration: nodeResult.duration,
-                          };
-                        });
-                        console.log("Formatted outputs:", formattedOutputs);
-                        setNodeOutputs(formattedOutputs);
-                      }
-                      if (result.status !== "completed") {
-                        alert(`Workflow failed: ${result.error}`);
-                      }
-                    },
-                    onError: (error) => {
-                      console.error("Execution error:", error);
-                      addLog({ level: "error", message: `Execution failed: ${error.message}` });
-                      alert(`Error: ${error.message}`);
-                    },
+          
+          {/* Visual Studio-style Split Button: Run/Debug */}
+          <div className="flex items-center">
+            {/* Main Execute Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (executionMode === "debug") {
+                  // Start debug session
+                  try {
+                    console.log('[Debug] Starting debug session...');
+                    await startDebug();
+                    console.log('[Debug] Debug session started successfully');
+                    setRightSidebarOpen(true);
+                  } catch (error) {
+                    console.error('[Debug] Failed to start debug session:', error);
+                    alert(`Failed to start debug: ${error instanceof Error ? error.message : String(error)}`);
                   }
-                );
-              }
-            }}
-            disabled={runMutation.isPending || !workflow}
+                } else {
+                  // Run workflow normally
+                  if (workflow) {
+                    addLog({ level: "info", message: "Starting full workflow execution" });
+                    runMutation.mutate(
+                      {
+                        organizationId: organizationId,
+                        workflowId: workflow.id,
+                        triggerData: {},
+                      },
+                      {
+                        onSuccess: (result) => {
+                          console.log("Execution result received:", result);
+                          console.log("Node results:", result.nodeResults);
+                          
+                          const isSuccess = result.status === "completed";
+                          addLog({ 
+                            level: isSuccess ? "success" : "error", 
+                            message: isSuccess ? "Workflow execution completed" : `Workflow failed: ${result.error}`,
+                          });
+                          
+                          // Update node outputs with execution results
+                          if (result.nodeResults) {
+                            // Convert nodeResults to the expected format
+                            const formattedOutputs: Record<
+                              string,
+                              {
+                                status: "pending" | "running" | "completed" | "failed";
+                                output?: unknown;
+                                error?: string;
+                                duration?: number;
+                              }
+                            > = {};
+                            Object.entries(result.nodeResults).forEach(([nodeId, nodeResult]) => {
+                              const node = workflow.nodes.find(n => n.id === nodeId);
+                              const nodeLabel = node?.label || `Node ${nodeId.substring(0, 8)}`;
+                              
+                              if (nodeResult.status === "completed") {
+                                addLog({
+                                  level: "success",
+                                  nodeId,
+                                  nodeLabel,
+                                  message: `Completed in ${nodeResult.duration}ms`,
+                                });
+                              } else if (nodeResult.status === "failed") {
+                                addLog({
+                                  level: "error",
+                                  nodeId,
+                                  nodeLabel,
+                                  message: nodeResult.error || "Unknown error",
+                                });
+                              }
+                              
+                              formattedOutputs[nodeId] = {
+                                status: nodeResult.status,
+                                output: nodeResult.output,
+                                error: nodeResult.error,
+                                duration: nodeResult.duration,
+                              };
+                            });
+                            console.log("Formatted outputs:", formattedOutputs);
+                            setNodeOutputs(formattedOutputs);
+                          }
+                          if (result.status !== "completed") {
+                            alert(`Workflow failed: ${result.error}`);
+                          }
+                        },
+                        onError: (error) => {
+                          console.error("Execution error:", error);
+                          addLog({ level: "error", message: `Execution failed: ${error.message}` });
+                          alert(`Error: ${error.message}`);
+                        },
+                      }
+                    );
+                  }
+                }
+              }}
+              disabled={runMutation.isPending || !workflow || isDebugging}
+              className="rounded-r-none border-r-0"
+            >
+              {runMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Running...</>
+              ) : isDebugging ? (
+                <><Bug className="h-4 w-4 mr-2" />Debugging...</>
+              ) : executionMode === "debug" ? (
+                <><Bug className="h-4 w-4 mr-2" />Debug</>
+              ) : (
+                <><Play className="h-4 w-4 mr-2" />Run</>
+              )}
+            </Button>
+            
+            {/* Mode Selector Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={runMutation.isPending || isDebugging}
+                  className="rounded-l-none px-2"
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => setExecutionMode("run")}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Run
+                  {executionMode === "run" && <Check className="h-4 w-4 ml-auto" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setExecutionMode("debug")}
+                >
+                  <Bug className="h-4 w-4 mr-2" />
+                  Debug
+                  {executionMode === "debug" && <Check className="h-4 w-4 ml-auto" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+          </DropdownMenu>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDebugStateDialogOpen(true)}
+            title="View Workflow State"
+            className="px-2"
           >
-            <Play className="h-4 w-4 mr-2" />
-            {runMutation.isPending ? "Running..." : "Run"}
+            <Eye className="h-4 w-4" />
           </Button>
           <Button
             variant="default"
@@ -1357,33 +1568,35 @@ export default function WorkflowEditorPage() {
 
         <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Debug Toolbar */}
-            <div className="p-2 border-b">
-              <DebugToolbar
-                isDebugging={isDebugging}
-                isPaused={isPaused}
-                currentNodeId={debugCurrentNodeId}
-                onStartDebug={async () => {
-                  try {
-                    console.log('[Debug] Starting debug session...');
-                    await startDebug();
-                    console.log('[Debug] Debug session started successfully');
-                    // Auto-open right sidebar to show debug panel
-                    setRightSidebarOpen(true);
-                  } catch (error) {
-                    console.error('[Debug] Failed to start debug session:', error);
-                    alert(`Failed to start debug: ${error instanceof Error ? error.message : String(error)}`);
-                  }
-                }}
-                onStepOver={stepOver}
-                onContinue={continueExecution}
-                onStop={stopDebug}
-                isStarting={isStarting}
-                isStepping={isStepping}
-                isContinuing={isContinuing}
-                isStopping={isStopping}
-              />
-            </div>
+            {/* Debug Toolbar - Only show when debugging */}
+            {isDebugging && (
+              <div className="p-2 border-b">
+                <DebugToolbar
+                  isDebugging={isDebugging}
+                  isPaused={isPaused}
+                  currentNodeId={debugCurrentNodeId}
+                  onStartDebug={async () => {
+                    try {
+                      console.log('[Debug] Starting debug session...');
+                      await startDebug();
+                      console.log('[Debug] Debug session started successfully');
+                      // Auto-open right sidebar to show debug panel
+                      setRightSidebarOpen(true);
+                    } catch (error) {
+                      console.error('[Debug] Failed to start debug session:', error);
+                      alert(`Failed to start debug: ${error instanceof Error ? error.message : String(error)}`);
+                    }
+                  }}
+                  onStepOver={stepOver}
+                  onContinue={continueExecution}
+                  onStop={stopDebug}
+                  isStarting={isStarting}
+                  isStepping={isStepping}
+                  isContinuing={isContinuing}
+                  isStopping={isStopping}
+                />
+              </div>
+            )}
 
             <div className="flex-1 overflow-hidden relative">
               <WorkflowEditor
@@ -2418,6 +2631,207 @@ export default function WorkflowEditorPage() {
             );
           }}
         />
+      )}
+
+      {/* Debug State Dialog */}
+      {debugStateDialogOpen && (
+        <Dialog open={debugStateDialogOpen} onOpenChange={setDebugStateDialogOpen}>
+          <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Workflow Debug State</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+              {/* Workflow Info */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm border-b pb-2">Workflow Information</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <div className="text-muted-foreground text-xs mb-1">Name</div>
+                    <div className="font-medium">{workflow?.name || 'N/A'}</div>
+                  </div>
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <div className="text-muted-foreground text-xs mb-1">ID</div>
+                    <div className="font-mono text-xs">{workflow?.id || 'N/A'}</div>
+                  </div>
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <div className="text-muted-foreground text-xs mb-1">Version</div>
+                    <div className="font-medium">{workflow?.version || 'N/A'}</div>
+                  </div>
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <div className="text-muted-foreground text-xs mb-1">Organization ID</div>
+                    <div className="font-mono text-xs">{workflow?.organizationId || 'N/A'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nodes */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm border-b pb-2">Nodes ({getNodesRef.current?.().length || 0})</h3>
+                <div className="space-y-2">
+                  {(getNodesRef.current?.() || []).map((node, idx) => (
+                    <div key={node.id} className="bg-muted/30 p-3 rounded-md border border-border/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-medium text-sm">{node.data?.label || 'Unnamed Node'}</div>
+                        <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">{node.type}</div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">ID:</span>
+                          <span className="ml-1 font-mono">{node.id.substring(0, 8)}...</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Position:</span>
+                          <span className="ml-1">({Math.round(node.position.x)}, {Math.round(node.position.y)})</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Size:</span>
+                          <span className="ml-1">{node.width || 0} × {node.height || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {(getNodesRef.current?.().length || 0) === 0 && (
+                    <div className="text-center text-muted-foreground text-sm py-4">No nodes</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Edges */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm border-b pb-2">Connections ({getEdgesRef.current?.().length || 0})</h3>
+                <div className="space-y-2">
+                  {(getEdgesRef.current?.() || []).map((edge, idx) => {
+                    const sourceNode = getNodesRef.current?.().find(n => n.id === edge.source);
+                    const targetNode = getNodesRef.current?.().find(n => n.id === edge.target);
+                    return (
+                      <div key={edge.id} className="bg-muted/30 p-3 rounded-md border border-border/50">
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="flex-1 bg-background px-2 py-1 rounded">
+                            {sourceNode?.data?.label || 'Unknown'}
+                          </div>
+                          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                          <div className="flex-1 bg-background px-2 py-1 rounded">
+                            {targetNode?.data?.label || 'Unknown'}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {(getEdgesRef.current?.().length || 0) === 0 && (
+                    <div className="text-center text-muted-foreground text-sm py-4">No connections</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Node Outputs */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm border-b pb-2">Node Outputs</h3>
+                <div className="space-y-2">
+                  {Object.entries(nodeOutputs).length > 0 ? (
+                    Object.entries(nodeOutputs).map(([nodeId, output]: [string, any]) => {
+                      const node = getNodesRef.current?.().find(n => n.id === nodeId);
+                      return (
+                        <div key={nodeId} className="bg-muted/30 p-3 rounded-md border border-border/50">
+                          <div className="font-medium text-sm mb-2">{node?.data?.label || 'Unknown Node'}</div>
+                          <div className="text-xs space-y-1">
+                            <div className="flex gap-2">
+                              <span className="text-muted-foreground">Status:</span>
+                              <span className={output.status === 'completed' ? 'text-green-500' : 'text-red-500'}>
+                                {output.status}
+                              </span>
+                            </div>
+                            {output.duration && (
+                              <div className="flex gap-2">
+                                <span className="text-muted-foreground">Duration:</span>
+                                <span>{output.duration}ms</span>
+                              </div>
+                            )}
+                            {output.error && (
+                              <div className="text-red-500 mt-2">{output.error}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center text-muted-foreground text-sm py-4">No outputs yet</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Current State */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm border-b pb-2">Current State</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <div className="text-muted-foreground text-xs mb-1">Selected Node</div>
+                    <div className="font-mono text-xs">
+                      {selectedNodeId ? (
+                        <>
+                          {getNodesRef.current?.().find(n => n.id === selectedNodeId)?.data?.label || 'Unknown'}
+                          <div className="text-muted-foreground mt-1">{selectedNodeId.substring(0, 8)}...</div>
+                        </>
+                      ) : (
+                        'None'
+                      )}
+                    </div>
+                  </div>
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <div className="text-muted-foreground text-xs mb-1">Executing Node</div>
+                    <div className="font-mono text-xs">
+                      {executingNodeId ? (
+                        <>
+                          {getNodesRef.current?.().find(n => n.id === executingNodeId)?.data?.label || 'Unknown'}
+                          <div className="text-muted-foreground mt-1">{executingNodeId.substring(0, 8)}...</div>
+                        </>
+                      ) : (
+                        'None'
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logs */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm border-b pb-2">Workflow Logs ({workflowLogs.length})</h3>
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {workflowLogs.length > 0 ? (
+                    workflowLogs.map((log, idx) => (
+                      <div key={idx} className="text-xs p-2 bg-muted/30 rounded border-l-2" style={{
+                        borderLeftColor: log.level === 'error' ? '#ef4444' : log.level === 'success' ? '#22c55e' : '#6b7280'
+                      }}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                          {log.nodeLabel && <span className="font-medium">[{log.nodeLabel}]</span>}
+                          <span>{log.message}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground text-sm py-4">No logs</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Packages */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm border-b pb-2">Installed Packages ({installedPackages?.length || 0})</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {(installedPackages || []).map((pkg, idx) => (
+                    <div key={idx} className="bg-muted/30 p-2 rounded-md text-xs">
+                      <div className="font-medium">{pkg.name}</div>
+                      <div className="text-muted-foreground">v{pkg.version}</div>
+                    </div>
+                  ))}
+                  {(installedPackages?.length || 0) === 0 && (
+                    <div className="col-span-2 text-center text-muted-foreground text-sm py-4">No packages installed</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
