@@ -82,6 +82,17 @@ const handler = async (req: Request) => {
     },
     onError: ({ error, path }) => {
       console.error(`tRPC Error on '${path}':`, error);
+      
+      // Check if this is a Postgres unique constraint violation
+      if (error.cause && typeof error.cause === 'object') {
+        const cause = error.cause as any;
+        if (cause.code === '23505' && cause.constraint === 'webhooks_organization_id_path_unique') {
+          // Extract path from error details if available
+          const match = cause.detail?.match(/Key \(organization_id, path\)=\([^,]+, ([^)]+)\)/);
+          const webhookPath = match ? match[1] : 'this path';
+          error.message = `Webhook path "${webhookPath}" already exists. Please use a different path.`;
+        }
+      }
     },
   });
 

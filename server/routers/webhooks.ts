@@ -3,6 +3,7 @@ import { router, organizationProcedure } from "../trpc";
 import { db } from "@/db/db";
 import { webhooks, webhookRequests, workflows } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 
 export const webhooksRouter = router({
   // List all webhooks in organization
@@ -62,6 +63,7 @@ export const webhooksRouter = router({
         workflowId: z.string().uuid(),
         path: z.string().min(1),
         method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).default("POST"),
+        responseMode: z.enum(["waitForResult", "respondImmediately"]).default("waitForResult"),
         authType: z.enum(["none", "api_key", "bearer", "basic"]).optional(),
         authConfig: z.record(z.string(), z.unknown()).optional(),
         requestSchema: z.record(z.string(), z.unknown()).optional(),
@@ -80,21 +82,36 @@ export const webhooksRouter = router({
         throw new Error("Workflow not found");
       }
 
-      const [webhook] = await db
-        .insert(webhooks)
-        .values({
-          organizationId: ctx.organization.id,
-          workflowId: input.workflowId,
-          path: input.path,
-          method: input.method,
-          authType: input.authType,
-          authConfig: input.authConfig,
-          requestSchema: input.requestSchema,
-          isActive: workflow.isActive, // Inherit from workflow
-        })
-        .returning();
+      try {
+        const [webhook] = await db
+          .insert(webhooks)
+          .values({
+            organizationId: ctx.organization.id,
+            workflowId: input.workflowId,
+            path: input.path,
+            method: input.method,
+            responseMode: input.responseMode,
+            authType: input.authType,
+            authConfig: input.authConfig,
+            requestSchema: input.requestSchema,
+            isActive: workflow.isActive, // Inherit from workflow
+          })
+          .returning();
 
-      return webhook;
+        return { success: true, webhook, error: null };
+      } catch (error: any) {
+        // Check for unique constraint violation - Drizzle wraps the Postgres error
+        const pgError = error?.cause?.cause || error?.cause || error;
+        if (pgError?.code === '23505' && pgError?.constraint === 'webhooks_organization_id_path_unique') {
+          return { 
+            success: false, 
+            webhook: null, 
+            error: `Webhook path "${input.path}" already exists. Please use a different path.` 
+          };
+        }
+        // For other errors, still throw
+        throw error;
+      }
     }),
 
   // Update webhook
@@ -104,6 +121,7 @@ export const webhooksRouter = router({
         id: z.string().uuid(),
         path: z.string().min(1).optional(),
         method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).optional(),
+        responseMode: z.enum(["waitForResult", "respondImmediately"]).optional(),
         isActive: z.boolean().optional(),
         authType: z.enum(["none", "api_key", "bearer", "basic"]).optional(),
         authConfig: z.record(z.string(), z.unknown()).optional(),
@@ -127,11 +145,8 @@ export const webhooksRouter = router({
         )
         .returning();
 
-      if (!updated) {
-        throw new Error("Webhook not found");
-      }
-
-      return updated;
+      // Return null if not found instead of throwing
+      return updated || null;
     }),
 
   // Delete webhook

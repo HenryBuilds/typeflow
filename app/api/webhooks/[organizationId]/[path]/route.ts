@@ -3,6 +3,9 @@ import { db } from "@/db/db";
 import { webhooks, workflows, webhookRequests, executions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { WorkflowExecutor } from "@/server/services/workflow-executor";
+import { addWorkflowJob } from "@/lib/queue/workflow-queue";
+
+const ENABLE_QUEUE = process.env.ENABLE_WORKER_QUEUE === "true";
 
 export const dynamic = "force-dynamic";
 
@@ -243,7 +246,44 @@ async function handleWebhookRequest(
       // Continue even if saving fails
     }
 
-    // Execute workflow
+    // Execute workflow - conditional based on webhook's responseMode setting
+    if (ENABLE_QUEUE && webhook.responseMode === "respondImmediately") {
+      // Queue-based execution (async) - for "Respond Immediately" mode
+      try {
+        const job = await addWorkflowJob({
+          workflowId: webhook.workflowId,
+          organizationId,
+          trigger: "webhook",
+          input: triggerData,
+          webhookPath: path,
+        });
+
+        console.log(`[WEBHOOK] Workflow queued with job ID: ${job.id}`);
+
+        return NextResponse.json(
+          {
+            success: true,
+            message: "Workflow queued for execution",
+            jobId: job.id,
+            status: "queued",
+          },
+          { status: 202 } // 202 Accepted
+        );
+      } catch (error) {
+        console.error("Error queuing workflow:", error);
+        return NextResponse.json(
+          {
+            error: "Failed to queue workflow",
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Direct execution (sync) - for "Wait for Result" mode (default)
+
+    // Direct execution (sync) - original behavior
     const executor = new WorkflowExecutor();
 
     // Create execution record BEFORE executing
