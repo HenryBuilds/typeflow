@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Eye, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -845,10 +845,10 @@ export default function WorkflowEditorPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={logWorkflowState}
-              title="Log State to Console"
+              onClick={() => setDebugStateDialogOpen(true)}
+              title="View Workflow State & Information"
             >
-              <Eye className="h-4 w-4" />
+              <Info className="h-4 w-4" />
             </Button>
           </div>
           
@@ -1807,7 +1807,7 @@ export default function WorkflowEditorPage() {
                         size="sm"
                         onClick={logWorkflowState}
                       >
-                        <Eye className="h-4 w-4 mr-2" />
+                        <Info className="h-4 w-4 mr-2" />
                         Log to Console
                       </Button>
                     </div>
