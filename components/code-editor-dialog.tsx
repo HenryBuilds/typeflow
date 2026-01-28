@@ -741,10 +741,221 @@ ${utilities.map(util => {
 
   // Custom autocomplete for variables and types
   const customAutocomplete = useMemo(() => {
+    // JavaScript/TypeScript keywords for autocomplete
+    const jsKeywords = [
+      // Declaration keywords
+      { label: 'const', type: 'keyword', info: 'Declare a constant variable', boost: 100 },
+      { label: 'let', type: 'keyword', info: 'Declare a block-scoped variable', boost: 99 },
+      { label: 'var', type: 'keyword', info: 'Declare a function-scoped variable', boost: 50 },
+      { label: 'function', type: 'keyword', info: 'Declare a function', boost: 98 },
+      { label: 'async', type: 'keyword', info: 'Declare an async function', boost: 97 },
+      { label: 'await', type: 'keyword', info: 'Wait for a Promise', boost: 96 },
+      { label: 'return', type: 'keyword', info: 'Return a value from function', boost: 95 },
+      { label: 'class', type: 'keyword', info: 'Declare a class', boost: 80 },
+      { label: 'interface', type: 'keyword', info: 'Declare a TypeScript interface', boost: 85 },
+      { label: 'type', type: 'keyword', info: 'Declare a TypeScript type alias', boost: 84 },
+      { label: 'import', type: 'keyword', info: 'Import a module', boost: 90 },
+      { label: 'export', type: 'keyword', info: 'Export a module member', boost: 75 },
+      // Control flow
+      { label: 'if', type: 'keyword', info: 'Conditional statement', boost: 94 },
+      { label: 'else', type: 'keyword', info: 'Else branch', boost: 93 },
+      { label: 'for', type: 'keyword', info: 'For loop', boost: 92 },
+      { label: 'while', type: 'keyword', info: 'While loop', boost: 88 },
+      { label: 'do', type: 'keyword', info: 'Do-while loop', boost: 70 },
+      { label: 'switch', type: 'keyword', info: 'Switch statement', boost: 82 },
+      { label: 'case', type: 'keyword', info: 'Switch case', boost: 81 },
+      { label: 'default', type: 'keyword', info: 'Default case', boost: 79 },
+      { label: 'break', type: 'keyword', info: 'Break out of loop', boost: 78 },
+      { label: 'continue', type: 'keyword', info: 'Continue to next iteration', boost: 77 },
+      // Error handling
+      { label: 'try', type: 'keyword', info: 'Try block', boost: 91 },
+      { label: 'catch', type: 'keyword', info: 'Catch block', boost: 90 },
+      { label: 'finally', type: 'keyword', info: 'Finally block', boost: 76 },
+      { label: 'throw', type: 'keyword', info: 'Throw an error', boost: 83 },
+      // Operators and values
+      { label: 'new', type: 'keyword', info: 'Create new instance', boost: 87 },
+      { label: 'typeof', type: 'keyword', info: 'Get type of value', boost: 74 },
+      { label: 'instanceof', type: 'keyword', info: 'Check instance type', boost: 73 },
+      { label: 'in', type: 'keyword', info: 'Check property existence', boost: 72 },
+      { label: 'of', type: 'keyword', info: 'Iterate over values', boost: 86 },
+      { label: 'this', type: 'keyword', info: 'Current context', boost: 71 },
+      { label: 'true', type: 'keyword', info: 'Boolean true', boost: 60 },
+      { label: 'false', type: 'keyword', info: 'Boolean false', boost: 59 },
+      { label: 'null', type: 'keyword', info: 'Null value', boost: 58 },
+      { label: 'undefined', type: 'keyword', info: 'Undefined value', boost: 57 },
+      // Common snippets
+      { label: 'console.log', type: 'function', info: 'Log to console', boost: 100, apply: 'console.log()' },
+      { label: 'console.error', type: 'function', info: 'Log error to console', boost: 85, apply: 'console.error()' },
+      { label: 'JSON.stringify', type: 'function', info: 'Convert to JSON string', boost: 89, apply: 'JSON.stringify()' },
+      { label: 'JSON.parse', type: 'function', info: 'Parse JSON string', boost: 88, apply: 'JSON.parse()' },
+      { label: 'Object.keys', type: 'function', info: 'Get object keys', boost: 84, apply: 'Object.keys()' },
+      { label: 'Object.values', type: 'function', info: 'Get object values', boost: 83, apply: 'Object.values()' },
+      { label: 'Object.entries', type: 'function', info: 'Get object entries', boost: 82, apply: 'Object.entries()' },
+      { label: 'Object.assign', type: 'function', info: 'Merge objects', boost: 81, apply: 'Object.assign()' },
+      { label: 'Array.isArray', type: 'function', info: 'Check if value is array', boost: 80, apply: 'Array.isArray()' },
+      { label: 'Array.from', type: 'function', info: 'Create array from iterable', boost: 79, apply: 'Array.from()' },
+      { label: 'Promise.all', type: 'function', info: 'Wait for all promises', boost: 78, apply: 'Promise.all()' },
+      { label: 'Promise.resolve', type: 'function', info: 'Create resolved promise', boost: 70, apply: 'Promise.resolve()' },
+      // CommonJS / Node.js
+      { label: 'module.exports', type: 'keyword', info: 'Export module (CommonJS)', boost: 95, apply: 'module.exports = ' },
+      { label: 'exports', type: 'keyword', info: 'Export object (CommonJS)', boost: 90 },
+      { label: 'require', type: 'function', info: 'Import module (CommonJS)', boost: 94, apply: "require('')" },
+      // Math
+      { label: 'Math.floor', type: 'function', info: 'Round down', boost: 75, apply: 'Math.floor()' },
+      { label: 'Math.ceil', type: 'function', info: 'Round up', boost: 74, apply: 'Math.ceil()' },
+      { label: 'Math.round', type: 'function', info: 'Round to nearest', boost: 73, apply: 'Math.round()' },
+      { label: 'Math.random', type: 'function', info: 'Random number 0-1', boost: 72, apply: 'Math.random()' },
+      { label: 'Math.max', type: 'function', info: 'Get maximum value', boost: 71, apply: 'Math.max()' },
+      { label: 'Math.min', type: 'function', info: 'Get minimum value', boost: 70, apply: 'Math.min()' },
+      // Date
+      { label: 'Date.now', type: 'function', info: 'Current timestamp', boost: 69, apply: 'Date.now()' },
+      { label: 'new Date', type: 'keyword', info: 'Create Date object', boost: 68, apply: 'new Date()' },
+      // String methods (static)
+      { label: 'String.fromCharCode', type: 'function', info: 'Create string from char codes', boost: 60, apply: 'String.fromCharCode()' },
+      { label: 'parseInt', type: 'function', info: 'Parse integer from string', boost: 77, apply: 'parseInt()' },
+      { label: 'parseFloat', type: 'function', info: 'Parse float from string', boost: 76, apply: 'parseFloat()' },
+      { label: 'isNaN', type: 'function', info: 'Check if value is NaN', boost: 65, apply: 'isNaN()' },
+      { label: 'isFinite', type: 'function', info: 'Check if value is finite', boost: 64, apply: 'isFinite()' },
+      // Encoding
+      { label: 'encodeURIComponent', type: 'function', info: 'Encode URI component', boost: 63, apply: 'encodeURIComponent()' },
+      { label: 'decodeURIComponent', type: 'function', info: 'Decode URI component', boost: 62, apply: 'decodeURIComponent()' },
+      { label: 'encodeURI', type: 'function', info: 'Encode URI', boost: 61, apply: 'encodeURI()' },
+      { label: 'decodeURI', type: 'function', info: 'Decode URI', boost: 60, apply: 'decodeURI()' },
+      // Timers
+      { label: 'setTimeout', type: 'function', info: 'Delay execution', boost: 67, apply: 'setTimeout(() => {}, 1000)' },
+      { label: 'setInterval', type: 'function', info: 'Repeat execution', boost: 66, apply: 'setInterval(() => {}, 1000)' },
+      { label: 'clearTimeout', type: 'function', info: 'Cancel timeout', boost: 55, apply: 'clearTimeout()' },
+      { label: 'clearInterval', type: 'function', info: 'Cancel interval', boost: 54, apply: 'clearInterval()' },
+    ];
+
     return autocompletion({
       activateOnTyping: true,
       defaultKeymap: true,
       override: [
+        // Autocomplete for JavaScript/TypeScript keywords
+        (context) => {
+          // Don't trigger after dot (property access)
+          const beforeDot = context.matchBefore(/\.\w*$/);
+          if (beforeDot) return null;
+          
+          // Don't trigger if we're typing a $ variable
+          const dollarMatch = context.matchBefore(/\$[\w_]*/);
+          if (dollarMatch && dollarMatch.text.startsWith('$')) return null;
+          
+          const word = context.matchBefore(/[a-zA-Z][\w.]*/);
+          if (!word) return null;
+          
+          if (word.from === word.to && !context.explicit) return null;
+          
+          const typedText = word.text.toLowerCase();
+          
+          // Extract user-defined symbols from the current code
+          const fullCode = context.state.doc.toString();
+          const userSymbols: Array<{ label: string; type: string; info: string; boost: number }> = [];
+          
+          // Match function declarations: function name, async function name
+          const funcRegex = /(?:async\s+)?function\s+(\w+)/g;
+          let match: RegExpExecArray | null;
+          while ((match = funcRegex.exec(fullCode)) !== null) {
+            const name = match[1];
+            if (!userSymbols.some(s => s.label === name)) {
+              userSymbols.push({
+                label: name,
+                type: 'function',
+                info: 'User-defined function',
+                boost: 150, // Higher priority than keywords
+              });
+            }
+          }
+          
+          // Match arrow functions: const name = () =>, const name = async () =>
+          const arrowRegex = /(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>/g;
+          while ((match = arrowRegex.exec(fullCode)) !== null) {
+            const name = match[1];
+            if (!userSymbols.some(s => s.label === name)) {
+              userSymbols.push({
+                label: name,
+                type: 'function',
+                info: 'Arrow function',
+                boost: 150,
+              });
+            }
+          }
+          
+          // Match variable declarations: const name =, let name =, var name =
+          // Also matches type annotations: const name: Type =, const name: Type[] =
+          const varRegex = /(?:const|let|var)\s+(\w+)(?:\s*:\s*[^=]+)?\s*=/g;
+          while ((match = varRegex.exec(fullCode)) !== null) {
+            const name = match[1];
+            // Skip if already added as function
+            if (!userSymbols.some(s => s.label === name)) {
+              userSymbols.push({
+                label: name,
+                type: 'variable',
+                info: 'User-defined variable',
+                boost: 140,
+              });
+            }
+          }
+          
+          // Match class declarations: class Name
+          const classRegex = /class\s+(\w+)/g;
+          while ((match = classRegex.exec(fullCode)) !== null) {
+            const name = match[1];
+            if (!userSymbols.some(s => s.label === name)) {
+              userSymbols.push({
+                label: name,
+                type: 'class',
+                info: 'User-defined class',
+                boost: 145,
+              });
+            }
+          }
+          
+          // Match interface declarations: interface Name
+          const interfaceRegex = /interface\s+(\w+)/g;
+          while ((match = interfaceRegex.exec(fullCode)) !== null) {
+            const name = match[1];
+            if (!userSymbols.some(s => s.label === name)) {
+              userSymbols.push({
+                label: name,
+                type: 'interface',
+                info: 'User-defined interface',
+                boost: 145,
+              });
+            }
+          }
+          
+          // Match type declarations: type Name =
+          const typeRegex = /type\s+(\w+)\s*=/g;
+          while ((match = typeRegex.exec(fullCode)) !== null) {
+            const name = match[1];
+            if (!userSymbols.some(s => s.label === name)) {
+              userSymbols.push({
+                label: name,
+                type: 'type',
+                info: 'User-defined type',
+                boost: 145,
+              });
+            }
+          }
+          
+          // Combine user symbols with keywords, user symbols first
+          const allOptions = [...userSymbols, ...jsKeywords];
+          
+          // Filter by what user typed
+          const matchingOptions = allOptions.filter(k => 
+            k.label.toLowerCase().startsWith(typedText)
+          );
+          
+          if (matchingOptions.length === 0) return null;
+          
+          return {
+            from: word.from,
+            options: matchingOptions,
+            validFor: /^[a-zA-Z][\w.]*$/,
+          };
+        },
         // Autocomplete for $ variables
         (context) => {
           const word = context.matchBefore(/\$[\w_]*/);
