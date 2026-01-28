@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Webhook, Copy, ExternalLink, Radio, Send } from "lucide-react";
+import { Webhook, Copy, ExternalLink, Radio, Send, AlertCircle, CheckCircle2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 
@@ -18,10 +18,11 @@ interface WebhookDialogProps {
   initialConfig?: {
     path?: string;
     method?: string;
+    responseMode?: "waitForResult" | "respondImmediately";
     webhookId?: string;
   };
   initialLabel?: string;
-  onSave: (data: { label: string; config: { path: string; method: string; webhookId?: string } }) => void;
+  onSave: (data: { label: string; config: { path: string; method: string; responseMode?: "waitForResult" | "respondImmediately"; webhookId?: string } }) => void;
   onTestFlow?: (testData: Record<string, unknown>) => void;
 }
 
@@ -41,23 +42,58 @@ export function WebhookDialog({
   const [method, setMethod] = useState<"GET" | "POST" | "PUT" | "DELETE" | "PATCH">(
     (initialConfig?.method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH") || "POST"
   );
+  const [responseMode, setResponseMode] = useState<"waitForResult" | "respondImmediately">(
+    initialConfig?.responseMode || "waitForResult"
+  );
   const [copied, setCopied] = useState(false);
   const [webhookId, setWebhookId] = useState<string | undefined>(initialConfig?.webhookId);
   const [isListening, setIsListening] = useState(false);
   const [receivedRequest, setReceivedRequest] = useState<any>(null);
   const [pollingIntervalId, setPollingIntervalId] = useState<NodeJS.Timeout | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const createMutation = trpc.webhooks.create.useMutation();
   const updateMutation = trpc.webhooks.update.useMutation();
   const utils = trpc.useUtils();
 
-  // Generate a random path if not provided
+  // Generate a random path only if not provided in initialConfig
   useEffect(() => {
-    if (!path && open) {
+    // Only generate if we don't have an initial path AND the dialog is opening
+    if (!initialConfig?.path && !path && open) {
       const randomPath = Math.random().toString(36).substring(2, 15);
       setPath(randomPath);
     }
-  }, [open, path]);
+  }, [open]); // Remove 'path' from dependencies to prevent regeneration
+
+  // Query to find existing webhook by path (in case webhookId is missing from config)
+  const existingWebhookQuery = trpc.webhooks.list.useQuery(
+    { organizationId },
+    { enabled: open && !!initialConfig?.path && !initialConfig?.webhookId }
+  );
+
+  // Reset state when dialog opens with existing config
+  useEffect(() => {
+    if (open) {
+      setLabel(initialLabel);
+      setPath(initialConfig?.path || "");
+      setMethod((initialConfig?.method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH") || "POST");
+      setResponseMode(initialConfig?.responseMode || "waitForResult");
+      
+      // Try to find webhookId from config or from existing webhook
+      let foundWebhookId = initialConfig?.webhookId;
+      if (!foundWebhookId && initialConfig?.path && existingWebhookQuery.data) {
+        const existingWebhook = existingWebhookQuery.data.find(
+          w => w.path === initialConfig.path && w.workflowId === workflowId
+        );
+        if (existingWebhook) {
+          foundWebhookId = existingWebhook.id;
+        }
+      }
+      setWebhookId(foundWebhookId);
+      console.log('[WEBHOOK DIALOG INIT] webhookId:', foundWebhookId, 'path:', initialConfig?.path, 'from query:', !!existingWebhookQuery.data);
+    }
+  }, [open, initialConfig, initialLabel, existingWebhookQuery.data, workflowId]);
 
   // Cleanup polling on unmount or when listening stops
   useEffect(() => {
@@ -81,29 +117,43 @@ export function WebhookDialog({
     : null;
 
   const handleSave = async () => {
+    setError(null);
+    setSuccess(null);
+    
     if (!path.trim()) {
-      alert("Please enter a webhook path");
+      setError("Please enter a webhook path");
       return;
     }
 
     try {
+      console.log('[WEBHOOK SAVE] webhookId:', webhookId, 'path:', path);
+      
       if (webhookId) {
-        // Update existing webhook
+        // Update existing webhook - only send responseMode, not path
+        // Path changes are not supported in update to avoid duplicate path issues
+        console.log('[WEBHOOK SAVE] Calling UPDATE with responseMode:', responseMode);
         await updateMutation.mutateAsync({
           organizationId,
           id: webhookId,
-          path: path.trim(),
-          method,
+          responseMode,
         });
       } else {
         // Create new webhook
-        const newWebhook = await createMutation.mutateAsync({
+        const result = await createMutation.mutateAsync({
           organizationId,
           workflowId,
           path: path.trim(),
           method,
+          responseMode,
         });
-        setWebhookId(newWebhook.id);
+        
+        // Check for errors in result
+        if (!result.success) {
+          setError(result.error || "Failed to create webhook");
+          return;
+        }
+        
+        setWebhookId(result.webhook!.id);
       }
 
       onSave({
@@ -111,14 +161,17 @@ export function WebhookDialog({
         config: {
           path: path.trim(),
           method,
-          webhookId: webhookId || createMutation.data?.id,
+          responseMode,
+          webhookId: webhookId || createMutation.data?.webhook?.id,
         },
       });
 
       await utils.webhooks.list.invalidate({ organizationId });
+      setSuccess(webhookId ? "Webhook updated successfully" : "Webhook created successfully");
     } catch (error) {
       console.error("Error saving webhook:", error);
-      alert(`Error saving webhook: ${error instanceof Error ? error.message : "Unknown error"}`);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      setError(errorMessage);
     }
   };
 
@@ -157,24 +210,24 @@ export function WebhookDialog({
     // First ensure webhook is saved
     let currentWebhookId = webhookId;
     if (!currentWebhookId && path.trim()) {
-      try {
-        const newWebhook = await createMutation.mutateAsync({
-          organizationId,
-          workflowId,
-          path: path.trim(),
-          method,
-        });
-        setWebhookId(newWebhook.id);
-        currentWebhookId = newWebhook.id;
-      } catch (error) {
-        console.error("Error creating webhook:", error);
-        alert(`Error creating webhook: ${error instanceof Error ? error.message : "Unknown error"}`);
+      const result = await createMutation.mutateAsync({
+        organizationId,
+        workflowId,
+        path: path.trim(),
+        method,
+      });
+      
+      if (!result.success) {
+        setError(result.error || "Failed to create webhook");
         return;
       }
+      
+      setWebhookId(result.webhook!.id);
+      currentWebhookId = result.webhook!.id;
     }
 
     if (!currentWebhookId) {
-      alert("Please save the webhook first");
+      setError("Please save the webhook first");
       return;
     }
     
@@ -248,11 +301,27 @@ export function WebhookDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Webhook className="h-5 w-5 text-purple-500" />
+            <Webhook className="h-5 w-5 text-primary" />
             Configure Webhook
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {/* Error Message */}
+          {error && (
+            <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+              <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+          
+          {/* Success Message */}
+          {success && (
+            <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md">
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-green-700 dark:text-green-400">{success}</p>
+            </div>
+          )}
+          
           <div>
             <Label htmlFor="label">Node Label</Label>
             <Input
@@ -277,6 +346,59 @@ export function WebhookDialog({
               <option value="DELETE">DELETE</option>
               <option value="PATCH">PATCH</option>
             </select>
+          </div>
+
+          <div>
+            <Label>Response Mode</Label>
+            <div className="space-y-2 mt-2">
+              <div 
+                className={`p-3 border rounded-md cursor-pointer transition-colors ${
+                  responseMode === "waitForResult" 
+                    ? "border-primary bg-primary/10" 
+                    : "border-border hover:border-primary/50"
+                }`}
+                onClick={() => setResponseMode("waitForResult")}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    checked={responseMode === "waitForResult"}
+                    onChange={() => setResponseMode("waitForResult")}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">Wait for Result</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Webhook waits for workflow to complete and returns the final output. Best for most use cases.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div 
+                className={`p-3 border rounded-md cursor-pointer transition-colors ${
+                  responseMode === "respondImmediately" 
+                    ? "border-primary bg-primary/10" 
+                    : "border-border hover:border-primary/50"
+                }`}
+                onClick={() => setResponseMode("respondImmediately")}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    checked={responseMode === "respondImmediately"}
+                    onChange={() => setResponseMode("respondImmediately")}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">Respond Immediately</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Webhook returns immediately with job ID. Workflow runs in background. Use for long-running workflows.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>
