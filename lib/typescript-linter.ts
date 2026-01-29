@@ -1400,9 +1400,6 @@ declare const $credentials: Record<string, any>;
             "does not exist on type 'never'", // False positive with empty arrays
             "Property 'length' does not exist", // Common false positive with arrays
 
-            "is not assignable to type", // False positive when TS can't infer complex types
-            "Type '{}' is not assignable", // Same as above
-
           ];
           
           if (skipErrorPatterns.some(pattern => message.includes(pattern))) {
