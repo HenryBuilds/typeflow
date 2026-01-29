@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState, useRef } from "react";
+import { useEffect, useCallback, useState, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,15 @@ export default function WorkflowEditorPage() {
 
   // Get installed packages for type definitions
   const { data: installedPackages } = usePackages(organizationId);
+
+  // Memoize package type definitions to avoid re-calculating on every render
+  const packageTypeDefinitions = useMemo(() => {
+    if (!installedPackages) return "";
+    return installedPackages
+      .map(pkg => pkg.typeDefinitions)
+      .filter(Boolean)
+      .join("\n\n");
+  }, [installedPackages]);
 
   const [editorData, setEditorData] = useState<{ nodes: Node[]; edges: Edge[] } | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -1609,7 +1618,7 @@ export default function WorkflowEditorPage() {
                   
                   return typeDefs;
                 })()}
-                packageTypeDefinitions={installedPackages?.map(pkg => pkg.typeDefinitions).filter(Boolean).join('\n\n')}
+                packageTypeDefinitions={packageTypeDefinitions}
                 installedPackages={installedPackages?.map(pkg => ({ name: pkg.name, version: pkg.version }))}
                 nodeOutputs={nodeOutputs}
                 debugMode={isDebugging}
