@@ -1,0 +1,1 @@
+ALTER TABLE "custom_nodes" DROP CONSTRAINT "custom_nodes_organization_id_description_unique";

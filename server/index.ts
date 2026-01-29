@@ -8,6 +8,8 @@ import { webhooksRouter } from "./routers/webhooks";
 import { credentialsRouter } from "./routers/credentials";
 import { authRouter } from "./routers/auth";
 import { debugRouter } from "./routers/debug";
+import { customNodesRouter } from "./routers/custom-nodes";
+import { externalNodesRouter } from "./routers/external-nodes";
 
 export const appRouter = router({
   auth: authRouter,
@@ -19,6 +21,8 @@ export const appRouter = router({
   webhooks: webhooksRouter,
   credentials: credentialsRouter,
   debug: debugRouter,
+  customNodes: customNodesRouter,
+  externalNodes: externalNodesRouter,
 });
 
 // Export type router type signature,

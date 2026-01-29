@@ -13,6 +13,10 @@
 # typeflow packages
 /.typeflow-packages
 
+# node starter template build output
+/templates/typeflow-node-starter/dist
+/templates/typeflow-node-starter/node_modules
+
 # testing
 /coverage
 

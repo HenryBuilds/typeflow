@@ -15,6 +15,7 @@ export * from "./webhook-requests";
 export * from "./environments";
 export * from "./credentials";
 export * from "./debug-sessions";
+export * from "./custom-nodes";
 
 // Import tables for relations
 import { organizations } from "./organizations";
@@ -30,6 +31,7 @@ import { webhookRequests } from "./webhook-requests";
 import { packages } from "./packages";
 import { environments } from "./environments";
 import { credentials } from "./credentials";
+import { customNodes } from "./custom-nodes";
 
 // Define all relations here to avoid circular dependencies
 export const organizationsRelations = relations(organizations, ({ many }) => ({
@@ -41,6 +43,7 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   executions: many(executions),
   logs: many(logs),
   credentials: many(credentials),
+  customNodes: many(customNodes),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -203,3 +206,14 @@ export type NewEnvironment = InferInsertModel<typeof environments>;
 
 export type Credential = InferSelectModel<typeof credentials>;
 export type NewCredential = InferInsertModel<typeof credentials>;
+
+export type CustomNode = InferSelectModel<typeof customNodes>;
+export type NewCustomNode = InferInsertModel<typeof customNodes>;
+
+// Custom nodes relations
+export const customNodesRelations = relations(customNodes, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [customNodes.organizationId],
+    references: [organizations.id],
+  }),
+}));

@@ -4,6 +4,7 @@ import { useEffect, useCallback, useState, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -39,6 +40,7 @@ import {
   SummarizeNodeDialog,
   EditFieldsNodeDialog,
   HttpRequestNodeDialog,
+  ExternalNodeDialog,
 } from "@/components/nodes/dialogs";
 import { useSaveWorkflow, useWorkflow, useUpdateWorkflow } from "@/hooks/use-workflows";
 import { usePackages } from "@/hooks/use-packages";
@@ -47,6 +49,8 @@ import { DebugToolbar } from "@/components/debug-toolbar";
 import { DebugPanel } from "@/components/debug-panel";
 import { useDebug } from "@/hooks/use-debug";
 import { Node, Edge } from "reactflow";
+import { trpc } from "@/lib/trpc";
+import { Puzzle } from "lucide-react";
 
 export default function WorkflowEditorPage() {
   const params = useParams();
@@ -62,6 +66,12 @@ export default function WorkflowEditorPage() {
 
   // Get installed packages for type definitions
   const { data: installedPackages } = usePackages(organizationId);
+
+  // Get external/custom nodes
+  const { data: externalNodes } = trpc.externalNodes.list.useQuery(
+    { organizationId },
+    { enabled: !!organizationId }
+  );
 
   // Memoize package type definitions to avoid re-calculating on every render
   const packageTypeDefinitions = useMemo(() => {
@@ -114,11 +124,22 @@ export default function WorkflowEditorPage() {
   const [editingEditFieldsNode, setEditingEditFieldsNode] = useState<Node | null>(null);
   const [httpRequestDialogOpen, setHttpRequestDialogOpen] = useState(false);
   const [editingHttpRequestNode, setEditingHttpRequestNode] = useState<Node | null>(null);
+  // External node dialog
+  const [externalNodeDialogOpen, setExternalNodeDialogOpen] = useState(false);
+  const [editingExternalNode, setEditingExternalNode] = useState<Node | null>(null);
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [debugStateDialogOpen, setDebugStateDialogOpen] = useState(false);
   const [workflowLogs, setWorkflowLogs] = useState<WorkflowLog[]>([]);
   const [logPanelCollapsed, setLogPanelCollapsed] = useState(false); // Start expanded by default so it's visible
   const [executionMode, setExecutionMode] = useState<"run" | "debug">("run"); // New state for execution mode
+  // Sidebar category collapse state
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [nodeSearch, setNodeSearch] = useState("");
+  // Helper function to filter nodes by search
+  const matchesSearch = useCallback((nodeName: string) => {
+    if (!nodeSearch) return true;
+    return nodeName.toLowerCase().includes(nodeSearch.toLowerCase());
+  }, [nodeSearch]);
   const [nodeOutputs, setNodeOutputs] = useState<Record<
     string,
     {
@@ -161,6 +182,7 @@ export default function WorkflowEditorPage() {
   const updateWorkflowMutation = useUpdateWorkflow(organizationId);
   const getNodesRef = useRef<(() => Node[]) | null>(null);
   const getEdgesRef = useRef<(() => Edge[]) | null>(null);
+  const setNodesRef = useRef<((nodes: Node[] | ((nodes: Node[]) => Node[])) => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Debug hook
@@ -435,10 +457,55 @@ export default function WorkflowEditorPage() {
     );
   }, [workflow, updateWorkflowMutation, organizationId, workflowId, addLog]);
 
+  // Compute input data for the external node dialog based on connections and nodeOutputs
+  const externalNodeInputData = useMemo(() => {
+    if (!editingExternalNode || !workflow) return [];
+    
+    const nodeId = editingExternalNode.id;
+    const connections = workflow.connections || [];
+    const nodes = workflow.nodes || [];
+    
+    // Find all nodes that connect to this node
+    const incomingConnections = connections.filter(c => c.targetNodeId === nodeId);
+    
+    const inputData: Array<{
+      sourceNodeId: string;
+      output: unknown;
+      sourceNodeLabel?: string;
+    }> = [];
+    
+    incomingConnections.forEach(conn => {
+      const sourceNode = nodes.find(n => n.id === conn.sourceNodeId);
+      const sourceOutput = nodeOutputs[conn.sourceNodeId];
+      
+      if (sourceOutput?.output) {
+        inputData.push({
+          sourceNodeId: conn.sourceNodeId,
+          output: sourceOutput.output,
+          sourceNodeLabel: sourceNode?.label || `Node ${conn.sourceNodeId.slice(0, 8)}`,
+        });
+      }
+    });
+    
+    return inputData;
+  }, [editingExternalNode, workflow, nodeOutputs]);
+
+  // Get source node labels for the external node dialog
+  const sourceNodeLabels = useMemo(() => {
+    if (!workflow) return {};
+    
+    const labels: Record<string, string> = {};
+    workflow.nodes.forEach(node => {
+      labels[node.id] = node.label || `Node ${node.id.slice(0, 8)}`;
+    });
+    return labels;
+  }, [workflow]);
+
   const handleSave = useCallback(() => {
     if (!workflow) {
       return;
     }
+
 
     // Get current nodes and edges from editor
     const currentNodes = getNodesRef.current?.() || [];
@@ -1087,10 +1154,33 @@ export default function WorkflowEditorPage() {
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto p-3">
-              {/* Triggers Section */}
+              {/* Search Input */}
               <div className="mb-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Triggers</h4>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search nodes..."
+                    value={nodeSearch}
+                    onChange={(e) => setNodeSearch(e.target.value)}
+                    className="h-8 pl-8 text-sm"
+                  />
+                </div>
+              </div>
+              {/* Triggers Section */}
+              {(!nodeSearch || ["trigger", "webhook", "manual trigger", "schedule", "chat trigger"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
+              <div className="mb-4">
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, triggers: !prev.triggers }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Triggers</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.triggers ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.triggers && (
                 <div className="space-y-1.5">
+                  {matchesSearch("trigger") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1108,6 +1198,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("webhook") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1125,6 +1217,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("manual trigger") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1142,6 +1236,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("schedule") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1159,6 +1255,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("chat trigger") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1176,13 +1274,25 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
+                )}
               </div>
-              
+              )}
               {/* Actions Section */}
+              {(!nodeSearch || ["code", "execute workflow", "response", "http request", "wait", "no operation"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
               <div className="mb-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Actions</h4>
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, actions: !prev.actions }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Actions</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.actions ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.actions && (
                 <div className="space-y-1.5">
+                  {matchesSearch("code") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1200,7 +1310,9 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
 
+                  {matchesSearch("execute workflow") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1218,7 +1330,9 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
 
+                  {matchesSearch("response") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1236,6 +1350,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("http request") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1253,6 +1369,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("wait") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1270,6 +1388,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("no operation") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1287,13 +1407,26 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
+                )}
               </div>
+              )}
               
               {/* Utilities Section */}
+              {(!nodeSearch || ["utilities"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
               <div className="mb-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Utilities</h4>
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, utilities: !prev.utilities }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Utilities</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.utilities ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.utilities && (
                 <div className="space-y-1.5">
+                  {matchesSearch("utilities") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1311,13 +1444,27 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
+                )}
               </div>
 
+              )}
+
               {/* Data Transformation Section */}
+              {(!nodeSearch || ["edit fields", "date & time"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
               <div className="mb-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Transform Data</h4>
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, transform: !prev.transform }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Transform Data</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.transform ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.transform && (
                 <div className="space-y-1.5">
+                  {matchesSearch("edit fields") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1335,6 +1482,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("date & time") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1352,13 +1501,26 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
+                )}
               </div>
+              )}
 
               {/* Filter & Limit Section */}
+              {(!nodeSearch || ["filter", "limit", "remove duplicates", "split out"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
               <div className="mb-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Filter Items</h4>
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, filterItems: !prev.filterItems }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Filter Items</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.filterItems ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.filterItems && (
                 <div className="space-y-1.5">
+                  {matchesSearch("filter") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1376,6 +1538,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("limit") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1393,6 +1557,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("remove duplicates") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1410,6 +1576,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("split out") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1427,13 +1595,26 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
+                )}
               </div>
+              )}
 
               {/* Combine Items Section */}
+              {(!nodeSearch || ["aggregate", "merge", "summarize"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
               <div className="mb-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Combine Items</h4>
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, combineItems: !prev.combineItems }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Combine Items</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.combineItems ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.combineItems && (
                 <div className="space-y-1.5">
+                  {matchesSearch("aggregate") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1451,6 +1632,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("merge") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1468,6 +1651,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("summarize") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1485,13 +1670,26 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
+                )}
               </div>
+              )}
 
               {/* Subworkflow Section */}
+              {(!nodeSearch || ["workflow input", "workflow output"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
               <div className="mb-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Subworkflow</h4>
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, subworkflow: !prev.subworkflow }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Subworkflow</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.subworkflow ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.subworkflow && (
                 <div className="space-y-1.5">
+                  {matchesSearch("workflow input") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1509,6 +1707,8 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
+                  {matchesSearch("workflow output") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1526,13 +1726,26 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
+                )}
               </div>
+              )}
 
               {/* Other Section */}
+              {(!nodeSearch || ["generic"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
               <div className="mb-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">Other</h4>
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, other: !prev.other }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Other</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.other ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.other && (
                 <div className="space-y-1.5">
+                  {matchesSearch("generic") && (
                   <div
                     draggable
                     onDragStart={(e) => {
@@ -1550,8 +1763,59 @@ export default function WorkflowEditorPage() {
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
+                )}
               </div>
+              )}
+
+              {/* Custom Nodes Section */}
+              {externalNodes && externalNodes.length > 0 && 
+              (!nodeSearch || externalNodes.some(n => n.displayName.toLowerCase().includes(nodeSearch.toLowerCase()))) && (
+                <div className="mb-4">
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, customNodes: !prev.customNodes }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Custom Nodes</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.customNodes ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.customNodes && (
+                <div className="space-y-1.5">
+                    {externalNodes.map((node) => {
+                      if (!matchesSearch(node.displayName)) return null;
+                      const nodeColor = (node as any).iconColor || "#6b7280";
+                      return (
+                      <div
+                        key={node.name}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("application/reactflow", `external:${node.name}`);
+                        }}
+                        className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div 
+                            className="flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center transition-colors"
+                            style={{ backgroundColor: `${nodeColor}15` }}
+                          >
+                            <Puzzle className="h-4 w-4" style={{ color: nodeColor }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium block">{node.displayName}</span>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {node.isDeclarative ? 'Declarative' : 'Programmatic'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      );
+                    })}
+                  </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1608,6 +1872,7 @@ export default function WorkflowEditorPage() {
                 workflow={workflow as any}
                 getNodesRef={getNodesRef}
                 getEdgesRef={getEdgesRef}
+                setNodesRef={setNodesRef}
                 selectedNodeId={selectedNodeId}
                 onNodeSelect={setSelectedNodeId}
                 onExecuteNode={handleExecuteNode}
@@ -1625,6 +1890,7 @@ export default function WorkflowEditorPage() {
                 breakpoints={breakpoints}
                 debugCurrentNodeId={debugCurrentNodeId}
                 onToggleBreakpoint={toggleBreakpoint}
+                externalNodes={externalNodes}
                 onWebhookEdit={(nodeId, node) => {
                   setEditingWebhookNode(node);
                   setWebhookDialogOpen(true);
@@ -1685,8 +1951,53 @@ export default function WorkflowEditorPage() {
                   setEditingSummarizeNode(node);
                   setSummarizeDialogOpen(true);
                 }}
+                onExternalNodeEdit={(nodeId, node) => {
+                  setEditingExternalNode(node);
+                  setExternalNodeDialogOpen(true);
+                }}
               />
             </div>
+
+            {/* External Node Dialog */}
+            <ExternalNodeDialog
+              open={externalNodeDialogOpen}
+              onOpenChange={setExternalNodeDialogOpen}
+              nodeId={editingExternalNode?.id || ""}
+              nodeInfo={editingExternalNode?.data?.nodeTypeDescription ? {
+                name: editingExternalNode.data.nodeTypeDescription.name,
+                displayName: editingExternalNode.data.nodeTypeDescription.displayName || editingExternalNode.data.label,
+                description: editingExternalNode.data.nodeTypeDescription.description,
+                properties: editingExternalNode.data.nodeTypeDescription.properties,
+              } : undefined}
+              initialConfig={editingExternalNode?.data?.config}
+              initialLabel={editingExternalNode?.data?.label}
+              inputData={externalNodeInputData}
+              sourceNodeLabels={sourceNodeLabels}
+              onSave={(data) => {
+                if (editingExternalNode && setNodesRef.current) {
+                  // Use setNodesRef to properly update nodes in the editor
+                  setNodesRef.current((nodes: Node[]) => 
+                    nodes.map((n: Node) => 
+                      n.id === editingExternalNode.id
+                        ? { 
+                            ...n, 
+                            data: { 
+                              ...n.data, 
+                              label: data.label, 
+                              config: {
+                                ...data.config,
+                                externalNodeType: n.data.externalNodeType || (n.data.config as Record<string, unknown>)?.externalNodeType,
+                              }
+                            } 
+                          }
+                        : n
+                    )
+                  );
+                }
+                setExternalNodeDialogOpen(false);
+                setEditingExternalNode(null);
+              }}
+            />
             
             {/* Debug Panel */}
             {debugPanelOpen && (

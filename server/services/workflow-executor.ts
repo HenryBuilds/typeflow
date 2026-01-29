@@ -1,9 +1,12 @@
 import { db } from "@/db/db";
-import { workflows, nodes, connections, executions } from "@/db/schema";
+import { workflows, nodes, connections, executions, customNodes } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import * as ts from "typescript";
 import { packageManager } from "./package-manager";
 import { credentialService } from "./credential-service";
+import { nodeLoader } from "./node-loader";
+import { declarativeExecutor } from "./declarative-executor";
+import { programmaticExecutor } from "./programmatic-executor";
 import * as Module from "module";
 import * as path from "path";
 import type {
@@ -249,6 +252,36 @@ export class WorkflowExecutor {
           outputItems = await this.executeHttpRequestNode(currentNode, inputItems);
         } else if (currentNode.type === "wait") {
           outputItems = await this.executeWaitNode(currentNode, inputItems);
+        } else if (currentNode.type === "externalNode") {
+          // External node from package - lookup actual node type from config
+          const externalNodeType = (currentNode.config as Record<string, unknown>)?.externalNodeType as string;
+          
+          if (!externalNodeType || !nodeLoader.hasNode(externalNodeType)) {
+            throw new Error(`External node type '${externalNodeType}' not found`);
+          }
+          
+          const nodeType = nodeLoader.getNode(externalNodeType)!;
+          const nodeConfig = currentNode.config as Record<string, unknown> || {};
+          
+          if (nodeType.execute) {
+            // Programmatic style
+            outputItems = await programmaticExecutor.execute(
+              nodeType,
+              inputItems,
+              nodeConfig,
+              organizationId,
+              { id: workflowId, name: workflow.name }
+            );
+          } else {
+            // Declarative style (routing-based)
+            const creds = await credentialService.getCredentials(organizationId);
+            outputItems = await declarativeExecutor.execute(
+              nodeType,
+              inputItems,
+              nodeConfig,
+              creds as Record<string, unknown>
+            );
+          }
         } else {
           outputItems = inputItems;
         }
@@ -520,6 +553,66 @@ export class WorkflowExecutor {
           
         } else if (currentNode.type === "wait") {
           outputItems = await this.executeWaitNode(currentNode, inputItems);
+          
+        } else if (currentNode.type.startsWith("custom_")) {
+          // Custom node (in-app) - execute user-defined code
+          outputItems = await this.executeCustomNode(currentNode, inputItems, organizationId);
+          
+        } else if (currentNode.type === "externalNode") {
+          // External node from package - lookup actual node type from config
+          const externalNodeType = (currentNode.config as Record<string, unknown>)?.externalNodeType as string;
+          
+          if (!externalNodeType || !nodeLoader.hasNode(externalNodeType)) {
+            throw new Error(`External node type '${externalNodeType}' not found`);
+          }
+          
+          const nodeType = nodeLoader.getNode(externalNodeType)!;
+          const nodeConfig = currentNode.config as Record<string, unknown> || {};
+          
+          if (nodeType.execute) {
+            // Programmatic style
+            outputItems = await programmaticExecutor.execute(
+              nodeType,
+              inputItems,
+              nodeConfig,
+              organizationId,
+              { id: workflowId, name: workflow.name }
+            );
+          } else {
+            // Declarative style (routing-based)
+            const creds = await credentialService.getCredentials(organizationId);
+            outputItems = await declarativeExecutor.execute(
+              nodeType,
+              inputItems,
+              nodeConfig,
+              creds as Record<string, unknown>
+            );
+          }
+          
+        } else if (nodeLoader.hasNode(currentNode.type)) {
+          // External node package - use appropriate executor
+          const nodeType = nodeLoader.getNode(currentNode.type)!;
+          const nodeConfig = currentNode.config as Record<string, unknown> || {};
+          
+          if (nodeType.execute) {
+            // Programmatic style
+            outputItems = await programmaticExecutor.execute(
+              nodeType,
+              inputItems,
+              nodeConfig,
+              organizationId,
+              { id: workflowId, name: workflow.name }
+            );
+          } else {
+            // Declarative style (routing-based)
+            const creds = await credentialService.getCredentials(organizationId);
+            outputItems = await declarativeExecutor.execute(
+              nodeType,
+              inputItems,
+              nodeConfig,
+              creds as Record<string, unknown>
+            );
+          }
           
         } else {
           // Generic node - just pass through
@@ -838,6 +931,34 @@ export class WorkflowExecutor {
           outputItems = await this.executeHttpRequestNode(currentNode, inputItems);
         } else if (currentNode.type === "wait") {
           outputItems = await this.executeWaitNode(currentNode, inputItems);
+        } else if (currentNode.type === "externalNode") {
+          // External node from package - lookup actual node type from config
+          const externalNodeType = (currentNode.config as Record<string, unknown>)?.externalNodeType as string;
+          
+          if (!externalNodeType || !nodeLoader.hasNode(externalNodeType)) {
+            throw new Error(`External node type '${externalNodeType}' not found`);
+          }
+          
+          const nodeType = nodeLoader.getNode(externalNodeType)!;
+          const nodeConfig = currentNode.config as Record<string, unknown> || {};
+          
+          if (nodeType.execute) {
+            outputItems = await programmaticExecutor.execute(
+              nodeType,
+              inputItems,
+              nodeConfig,
+              organizationId,
+              { id: workflowId, name: workflow.name }
+            );
+          } else {
+            const creds = await credentialService.getCredentials(organizationId);
+            outputItems = await declarativeExecutor.execute(
+              nodeType,
+              inputItems,
+              nodeConfig,
+              creds as Record<string, unknown>
+            );
+          }
         } else {
           outputItems = inputItems;
         }
@@ -1477,7 +1598,156 @@ ${utilitiesDeclarations}
     }
   }
 
+  /**
+   * Execute a custom node (user-defined node type)
+   */
+  private async executeCustomNode(
+    node: typeof nodes.$inferSelect,
+    inputItems: ExecutionItem[],
+    organizationId: string
+  ): Promise<ExecutionItem[]> {
+    // Extract the actual custom node type name (remove "custom_" prefix)
+    const customNodeTypeName = node.type.replace("custom_", "");
+
+    // Load the custom node definition from database
+    const allCustomNodes = await db.query.customNodes.findMany({
+      where: eq(customNodes.organizationId, organizationId),
+    });
+
+    const customNodeDef = allCustomNodes.find(cn => {
+      const desc = cn.description as { name: string };
+      return desc.name === customNodeTypeName;
+    });
+
+    if (!customNodeDef) {
+      throw new Error(`Custom node type '${customNodeTypeName}' not found`);
+    }
+
+    const description = customNodeDef.description as {
+      properties?: Array<{ name: string; default?: unknown }>;
+      credentials?: Array<{ name: string; required: boolean }>;
+    };
+    const executeCode = customNodeDef.executeCode;
+
+    if (!executeCode || executeCode.trim() === "") {
+      // No code - pass through
+      return inputItems;
+    }
+
+    // Build node config with defaults
+    const nodeConfig = node.config as Record<string, unknown> || {};
+    const config: Record<string, unknown> = {};
+    
+    // Apply defaults from description, then override with node config
+    for (const prop of description.properties || []) {
+      config[prop.name] = nodeConfig[prop.name] !== undefined 
+        ? nodeConfig[prop.name] 
+        : prop.default;
+    }
+
+    // Get credentials if required
+    let credentials: Record<string, unknown> = {};
+    if (description.credentials && description.credentials.length > 0) {
+      try {
+        credentials = await credentialService.getCredentials(organizationId) as Record<string, unknown>;
+      } catch (error) {
+        console.warn(`Failed to load credentials for custom node`);
+      }
+    }
+
+    // Create typeflow-style execution context
+    const $input = {
+      all: () => inputItems,
+      first: () => inputItems[0] || { json: {} },
+      last: () => inputItems[inputItems.length - 1] || { json: {} },
+      item: (index: number) => inputItems[index] || { json: {} },
+    };
+
+    const getNodeParameter = (name: string, itemIndex: number = 0) => {
+      return config[name];
+    };
+
+    const getCredentials = (name: string) => {
+      return credentials[name] || {};
+    };
+
+    // Compile TypeScript to JavaScript
+    const tsResult = ts.transpileModule(executeCode, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2020,
+        strict: false,
+        esModuleInterop: true,
+      },
+    });
+
+    const jsCode = tsResult.outputText;
+
+    // Create sandbox and execute
+    const vm = require("vm");
+    const sandbox = {
+      $input,
+      $item: (index: number) => inputItems[index] || { json: {} },
+      getNodeParameter,
+      getCredentials,
+      console: {
+        log: (...args: unknown[]) => console.log("[CustomNode]", ...args),
+        error: (...args: unknown[]) => console.error("[CustomNode]", ...args),
+        warn: (...args: unknown[]) => console.warn("[CustomNode]", ...args),
+      },
+      JSON,
+      Array,
+      Object,
+      String,
+      Number,
+      Boolean,
+      Date,
+      Math,
+      RegExp,
+      Error,
+      Promise,
+      setTimeout,
+      // Allow fetch for HTTP requests
+      fetch: globalThis.fetch,
+    };
+
+    const context = vm.createContext(sandbox);
+    
+    // Wrap code to capture return value
+    const wrappedCode = `
+      (async () => {
+        ${jsCode}
+      })()
+    `;
+
+    try {
+      const result = await vm.runInContext(wrappedCode, context, {
+        timeout: 30000, // 30 second timeout
+      });
+
+      // Normalize result to ExecutionItem[]
+      if (Array.isArray(result)) {
+        // Check if already in correct format
+        if (result.length === 0) {
+          return [{ json: {} }];
+        }
+        if (result[0] && typeof result[0] === "object" && "json" in result[0]) {
+          return result as ExecutionItem[];
+        }
+        // Wrap each item
+        return result.map(item => ({ json: item }));
+      } else if (result && typeof result === "object") {
+        return [{ json: result }];
+      } else {
+        return inputItems;
+      }
+    } catch (error: any) {
+      throw new Error(`Custom node execution failed: ${error.message}`);
+    }
+  }
+
   // ==================== NODE HANDLERS ====================
+
 
   private executeFilterNode(
     node: typeof nodes.$inferSelect,

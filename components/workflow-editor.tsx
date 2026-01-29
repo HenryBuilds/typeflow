@@ -41,6 +41,7 @@ import { NoopNode } from "./nodes/noop-node";
 import { ScheduleTriggerNode } from "./nodes/schedule-trigger-node";
 import { ManualTriggerNode } from "./nodes/manual-trigger-node";
 import { ChatTriggerNode } from "./nodes/chat-trigger-node";
+import { CustomNode } from "./nodes/custom-node";
 import { CodeEditorDialog } from "./code-editor-dialog";
 import { DeletableEdge } from "./deletable-edge";
 import { Workflow, WorkflowNode as WorkflowNodeType, WorkflowConnection } from "@/types/domain";
@@ -70,6 +71,7 @@ const nodeTypes: NodeTypes = {
   scheduleTrigger: ScheduleTriggerNode,
   manualTrigger: ManualTriggerNode,
   chatTrigger: ChatTriggerNode,
+  externalNode: CustomNode,
 };
 
 const edgeTypes = {
@@ -88,6 +90,7 @@ interface WorkflowEditorProps {
   }) => void;
   getNodesRef?: React.MutableRefObject<(() => Node[]) | null>;
   getEdgesRef?: React.MutableRefObject<(() => Edge[]) | null>;
+  setNodesRef?: React.MutableRefObject<((nodes: Node[] | ((nodes: Node[]) => Node[])) => void) | null>;
   selectedNodeId?: string | null;
   onNodeSelect?: (nodeId: string | null) => void;
   onExecuteNode?: (nodeId: string) => void;
@@ -122,6 +125,27 @@ interface WorkflowEditorProps {
   onSummarizeEdit?: (nodeId: string, node: Node) => void;
   onScheduleTriggerEdit?: (nodeId: string, node: Node) => void;
   onChatTriggerEdit?: (nodeId: string, node: Node) => void;
+  onExternalNodeEdit?: (nodeId: string, node: Node) => void;
+  // External nodes from node loader
+  externalNodes?: Array<{
+    name: string;
+    displayName: string;
+    description?: string;
+    icon?: string;
+    group?: string[];
+    version?: number | number[];
+    inputs?: string[];
+    outputs?: string[];
+    properties?: Array<{
+      displayName: string;
+      name: string;
+      type: string;
+      default?: unknown;
+      description?: string;
+      options?: Array<{ name: string; value: string | number | boolean }>;
+      required?: boolean;
+    }>;
+  }>;
   // Debug mode props
   debugMode?: boolean;
   breakpoints?: Set<string>;
@@ -135,6 +159,7 @@ export function WorkflowEditor({
   onSave,
   getNodesRef,
   getEdgesRef,
+  setNodesRef,
   selectedNodeId,
   onNodeSelect,
   onExecuteNode,
@@ -160,6 +185,8 @@ export function WorkflowEditor({
   onSummarizeEdit,
   onScheduleTriggerEdit,
   onChatTriggerEdit,
+  onExternalNodeEdit,
+  externalNodes = [],
   // Debug mode props
   debugMode = false,
   breakpoints = new Set(),
@@ -179,16 +206,49 @@ export function WorkflowEditor({
   // Convert database nodes to React Flow nodes
   const initialNodes: Node[] = useMemo(
     () =>
-      (workflow.nodes || []).map((node) => ({
-        id: node.id,
-        type: node.type || "workflow",
-        position: node.position,
-        data: {
-          label: node.label,
-          config: node.config || {},
-        },
-      })),
-    [workflow.nodes]
+      (workflow.nodes || []).map((node) => {
+        // For externalNode types, try to restore nodeTypeDescription from externalNodes
+        if (node.type === 'externalNode' && externalNodes.length > 0) {
+          const externalNodeType = (node.config as Record<string, unknown>)?.externalNodeType as string 
+            || node.label;
+          const nodeDescription = externalNodes.find(n => 
+            n.name === externalNodeType || n.displayName === node.label
+          );
+          
+          return {
+            id: node.id,
+            type: node.type,
+            position: node.position,
+            data: {
+              label: node.label,
+              config: {
+                ...(node.config as Record<string, unknown> || {}),
+                externalNodeType: externalNodeType, // Ensure externalNodeType is always in config
+              },
+              externalNodeType: externalNodeType,
+              nodeTypeDescription: nodeDescription ? {
+                name: nodeDescription.name,
+                displayName: nodeDescription.displayName,
+                description: nodeDescription.description,
+                inputs: nodeDescription.inputs || ['main'],
+                outputs: nodeDescription.outputs || ['main'],
+                properties: nodeDescription.properties || [],
+              } : undefined,
+            },
+          };
+        }
+        
+        return {
+          id: node.id,
+          type: node.type || "workflow",
+          position: node.position,
+          data: {
+            label: node.label,
+            config: node.config || {},
+          },
+        };
+      }),
+    [workflow.nodes, externalNodes]
   );
 
   // Convert database connections to React Flow edges
@@ -843,6 +903,28 @@ export function WorkflowEditor({
           },
         };
       }
+      if (node.type === "externalNode") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onExternalNodeEdit) {
+                onExternalNodeEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
+          },
+        };
+      }
       return {
         ...node,
         data: {
@@ -860,7 +942,7 @@ export function WorkflowEditor({
         },
       };
     });
-  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit, debugMode, breakpoints, debugCurrentNodeId, onToggleBreakpoint]);
+  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit, onExternalNodeEdit, debugMode, breakpoints, debugCurrentNodeId, onToggleBreakpoint]);
 
   const handleCodeSave = useCallback(
     (data: { code: string; label: string }) => {
@@ -939,14 +1021,65 @@ export function WorkflowEditor({
 
       if (!reactFlowInstance || !reactFlowWrapper.current) return;
 
-      const type = event.dataTransfer.getData("application/reactflow");
-      if (!type) return;
+      const rawType = event.dataTransfer.getData("application/reactflow");
+      if (!rawType) return;
 
       const position = reactFlowInstance.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
 
+      // Generate a proper UUID for the node
+      const generateUUID = () => {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      };
+
+      // Check if this is an external node (format: "external:nodeName")
+      if (rawType.startsWith('external:')) {
+        const externalNodeName = rawType.replace('external:', '');
+        
+        // Find the full node description from externalNodes
+        const nodeDescription = externalNodes.find(n => n.name === externalNodeName);
+        const displayName = nodeDescription?.displayName || externalNodeName;
+        const uniqueLabel = generateUniqueLabel(displayName, nodes);
+        
+        const newNode: Node = {
+          id: generateUUID(),
+          type: 'externalNode',
+          position,
+          data: {
+            label: uniqueLabel,
+            externalNodeType: externalNodeName,
+            nodeTypeDescription: nodeDescription ? {
+              name: nodeDescription.name,
+              displayName: nodeDescription.displayName,
+              description: nodeDescription.description,
+              inputs: nodeDescription.inputs || ['main'],
+              outputs: nodeDescription.outputs || ['main'],
+              properties: nodeDescription.properties || [],
+            } : {
+              name: externalNodeName,
+              displayName: uniqueLabel,
+              inputs: ['main'],
+              outputs: ['main'],
+              properties: [],
+            },
+            config: {
+              externalNodeType: externalNodeName,
+            },
+          },
+        };
+        
+        setNodes((nds) => nds.concat(newNode));
+        return;
+      }
+
+      // Handle built-in nodes
+      const type = rawType;
       const labelMap: Record<string, string> = {
         trigger: "Trigger",
         code: "Code Node",
@@ -975,15 +1108,6 @@ export function WorkflowEditor({
       const baseLabel = labelMap[type] || "Node";
       const uniqueLabel = generateUniqueLabel(baseLabel, nodes);
 
-      // Generate a proper UUID for the node
-      const generateUUID = () => {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-          const r = Math.random() * 16 | 0;
-          const v = c === 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
-        });
-      };
-
       const newNode: Node = {
         id: generateUUID(),
         type,
@@ -1007,6 +1131,9 @@ export function WorkflowEditor({
   }
   if (getEdgesRef) {
     getEdgesRef.current = () => edges;
+  }
+  if (setNodesRef) {
+    setNodesRef.current = setNodes;
   }
 
   return (
