@@ -1399,10 +1399,10 @@ declare const $credentials: Record<string, any>;
             "does not exist on type '{}'", // False positive when TypeScript can't infer literal types
             "does not exist on type 'never'", // False positive with empty arrays
             "Property 'length' does not exist", // Common false positive with arrays
-            "is missing the following properties", // False positive with object literals in arrays
+
             "is not assignable to type", // False positive when TS can't infer complex types
             "Type '{}' is not assignable", // Same as above
-            "Type '{}' is missing", // Object literal type inference issue
+
           ];
           
           if (skipErrorPatterns.some(pattern => message.includes(pattern))) {
