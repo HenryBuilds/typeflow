@@ -13,7 +13,7 @@ import { keymap, EditorView } from "@codemirror/view";
 import { indentWithTab, indentMore } from "@codemirror/commands";
 import { Prec } from "@codemirror/state";
 import { linter } from "@codemirror/lint";
-import { GripVertical, ChevronRight, ChevronDown, ChevronLeft, PanelLeftClose, PanelLeftOpen, FileType, Code2 } from "lucide-react";
+import { GripVertical, ChevronRight, ChevronDown, ChevronLeft, PanelLeftClose, PanelLeftOpen, FileType, Code2, Wrench } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { createTypeScriptLinter } from "@/lib/typescript-linter";
 import { trpc } from "@/lib/trpc";
@@ -1614,6 +1614,46 @@ ${utilities.map(util => {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {/* Utility Functions Section */}
+                  {utilities && utilities.length > 0 && (
+                    <div className="mt-4 pt-3 border-t">
+                      <h4 className="text-xs font-semibold text-muted-foreground mb-2 px-1">Utility Functions</h4>
+                      <div className="space-y-3">
+                        {utilities.map((utility) => (
+                          <div key={utility.label} className="space-y-1">
+                            <div className="flex items-center gap-1.5 px-2 py-1.5 bg-muted/50 rounded-md border">
+                              <Wrench className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs font-semibold text-foreground/70">
+                                {utility.label}
+                              </span>
+                            </div>
+                            <div className="pl-1 space-y-0.5">
+                              {utility.functions.map((funcName) => (
+                                <div
+                                  key={`${utility.label}-${funcName}`}
+                                  className="flex items-center gap-2 px-2 py-1 rounded text-xs hover:bg-accent/70 cursor-pointer transition-colors group"
+                                  onClick={() => {
+                                    // Sanitize label for usage in code (remove special chars)
+                                    const sanitizedLabel = utility.label.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^[0-9]/, '_$&');
+                                    const insertText = `$${sanitizedLabel}.${funcName}()`;
+                                    const pos = cursorPosition !== null ? cursorPosition : code.length;
+                                    const newCode = code.slice(0, pos) + insertText + code.slice(pos);
+                                    setCode(newCode);
+                                    setCursorPosition(pos + insertText.length - 1); // Position inside parentheses
+                                  }}
+                                  title={`Insert $${utility.label}.${funcName}()`}
+                                >
+                                  <div className="text-purple-600 dark:text-purple-400 font-mono">f</div>
+                                  <code className="font-mono text-foreground">{funcName}</code>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
