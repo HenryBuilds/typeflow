@@ -1804,8 +1804,8 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
-                        <Database className="h-4 w-4 text-blue-500" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Database className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">PostgreSQL</span>
@@ -1823,8 +1823,8 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                        <Database className="h-4 w-4 text-orange-500" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Database className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">MySQL</span>
@@ -1842,8 +1842,8 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
-                        <Database className="h-4 w-4 text-green-500" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Database className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">MongoDB</span>
@@ -1861,8 +1861,8 @@ export default function WorkflowEditorPage() {
                     className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-red-500/10 flex items-center justify-center group-hover:bg-red-500/20 transition-colors">
-                        <Database className="h-4 w-4 text-red-500" />
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <Database className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Redis</span>
@@ -2099,6 +2099,11 @@ export default function WorkflowEditorPage() {
                   setEditingExternalNode(node);
                   setExternalNodeDialogOpen(true);
                 }}
+                onDatabaseNodeEdit={(nodeId, node, dbType) => {
+                  setEditingDatabaseNode(node);
+                  setEditingDatabaseType(dbType);
+                  setDatabaseDialogOpen(true);
+                }}
               />
             </div>
 
@@ -2140,6 +2145,37 @@ export default function WorkflowEditorPage() {
                 }
                 setExternalNodeDialogOpen(false);
                 setEditingExternalNode(null);
+              }}
+            />
+            
+            {/* Database Node Dialog */}
+            <DatabaseNodeDialog
+              open={databaseDialogOpen}
+              onOpenChange={setDatabaseDialogOpen}
+              nodeId={editingDatabaseNode?.id || ""}
+              databaseType={editingDatabaseType}
+              organizationId={organizationId}
+              initialLabel={editingDatabaseNode?.data?.label}
+              initialConfig={editingDatabaseNode?.data?.config}
+              onSave={(data) => {
+                if (editingDatabaseNode && setNodesRef.current) {
+                  setNodesRef.current((nodes: Node[]) => 
+                    nodes.map((n: Node) => 
+                      n.id === editingDatabaseNode.id
+                        ? { 
+                            ...n, 
+                            data: { 
+                              ...n.data, 
+                              label: data.label, 
+                              config: data.config 
+                            } 
+                          }
+                        : n
+                    )
+                  );
+                }
+                setDatabaseDialogOpen(false);
+                setEditingDatabaseNode(null);
               }}
             />
             

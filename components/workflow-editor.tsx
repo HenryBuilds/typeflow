@@ -976,7 +976,7 @@ export function WorkflowEditor({
         },
       };
     });
-  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit, onExternalNodeEdit, debugMode, breakpoints, debugCurrentNodeId, onToggleBreakpoint]);
+  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit, onExternalNodeEdit, onDatabaseNodeEdit, debugMode, breakpoints, debugCurrentNodeId, onToggleBreakpoint]);
 
   const handleCodeSave = useCallback(
     (data: { code: string; label: string }) => {
@@ -1139,6 +1139,10 @@ export function WorkflowEditor({
         manualTrigger: "Manual Trigger",
         chatTrigger: "Chat Trigger",
         workflowTrigger: "Trigger by Workflow",
+        postgres: "PostgreSQL",
+        mysql: "MySQL",
+        mongodb: "MongoDB",
+        redis: "Redis",
       };
       const baseLabel = labelMap[type] || "Node";
       const uniqueLabel = generateUniqueLabel(baseLabel, nodes);
