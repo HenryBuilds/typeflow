@@ -2157,6 +2157,9 @@ export default function WorkflowEditorPage() {
               organizationId={organizationId}
               initialLabel={editingDatabaseNode?.data?.label}
               initialConfig={editingDatabaseNode?.data?.config}
+              onAddCredential={() => {
+                setCredentialsDialogOpen(true);
+              }}
               onSave={(data) => {
                 if (editingDatabaseNode && setNodesRef.current) {
                   setNodesRef.current((nodes: Node[]) => 

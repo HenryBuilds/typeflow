@@ -43,6 +43,7 @@ interface DatabaseNodeDialogProps {
   };
   initialLabel?: string;
   onSave: (data: { label: string; config: Record<string, unknown> }) => void;
+  onAddCredential?: () => void;
   // Input data from previous nodes for expression suggestions
   inputData?: Record<string, unknown>;
   sourceNodeLabels?: string[];
@@ -105,6 +106,7 @@ export function DatabaseNodeDialog({
   initialConfig,
   initialLabel,
   onSave,
+  onAddCredential,
   inputData,
   sourceNodeLabels,
 }: DatabaseNodeDialogProps) {
@@ -227,7 +229,7 @@ export function DatabaseNodeDialog({
                 <span className="text-sm text-muted-foreground">
                   No {DATABASE_LABELS[databaseType]} credentials found.
                 </span>
-                <Button variant="outline" size="sm" className="ml-auto">
+                <Button variant="outline" size="sm" className="ml-auto" onClick={onAddCredential}>
                   <Plus className="h-4 w-4 mr-1" />
                   Add Credential
                 </Button>
