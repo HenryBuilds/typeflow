@@ -45,36 +45,40 @@ export type CredentialConfig = PostgresConfig | MySQLConfig | MongoDBConfig | Re
 
 // Client wrapper classes
 export class PostgresCredential {
-  private client: PgClient;
-  private connected = false;
+  private client: PgClient | null = null;
+  private config: PostgresConfig;
 
-  constructor(private config: PostgresConfig) {
-    this.client = new PgClient({
-      host: config.host,
-      port: config.port,
-      database: config.database,
-      user: config.user,
-      password: config.password,
-      ssl: config.ssl ? { rejectUnauthorized: false } : false,
+  constructor(config: PostgresConfig) {
+    this.config = config;
+  }
+
+  private createClient(): PgClient {
+    return new PgClient({
+      host: this.config.host,
+      port: this.config.port,
+      database: this.config.database,
+      user: this.config.user,
+      password: this.config.password,
+      ssl: this.config.ssl ? { rejectUnauthorized: false } : false,
     });
   }
 
   async connect() {
-    if (!this.connected) {
+    if (!this.client) {
+      this.client = this.createClient();
       await this.client.connect();
-      this.connected = true;
     }
   }
 
   async query(sql: string, params?: unknown[]) {
     await this.connect();
-    return this.client.query(sql, params);
+    return this.client!.query(sql, params);
   }
 
   async disconnect() {
-    if (this.connected) {
+    if (this.client) {
       await this.client.end();
-      this.connected = false;
+      this.client = null;  // Allow creating a new client on next connect
     }
   }
 }

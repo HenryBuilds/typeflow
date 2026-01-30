@@ -39,6 +39,7 @@ export function CredentialDialog({
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
   const [ssl, setSsl] = useState(false);
+  const [sqlConnectionString, setSqlConnectionString] = useState("");
   
   // MongoDB fields
   const [connectionString, setConnectionString] = useState("");
@@ -111,6 +112,7 @@ export function CredentialDialog({
     setUser("");
     setPassword("");
     setSsl(false);
+    setSqlConnectionString("");
     setConnectionString("");
     setMongoDatabase("");
     setRedisHost("");
@@ -221,6 +223,77 @@ export function CredentialDialog({
           {(type === "postgres" || type === "mysql") && (
             <div className="space-y-3 border-t pt-4">
               <h3 className="font-semibold">Connection Details</h3>
+              
+              {/* Connection String Parser */}
+              <div className="p-3 bg-muted rounded-lg space-y-2">
+                <Label htmlFor="connString" className="text-sm font-medium">
+                  Paste Connection String (optional)
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="connString"
+                    value={sqlConnectionString}
+                    onChange={(e) => setSqlConnectionString(e.target.value)}
+                    placeholder={type === "postgres" 
+                      ? "postgresql://user:password@host:5432/database?sslmode=require"
+                      : "mysql://user:password@host:3306/database"
+                    }
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const url = sqlConnectionString.trim();
+                      if (!url) return;
+                      
+                      try {
+                        // Remove psql command prefix if present
+                        let cleanUrl = url;
+                        if (url.startsWith("psql ")) {
+                          cleanUrl = url.replace("psql ", "").replace(/^['"]|['"]$/g, "");
+                        }
+                        
+                        // Parse the URL using URL API for more robust parsing
+                        const parsed = new URL(cleanUrl);
+                        
+                        const parsedUser = decodeURIComponent(parsed.username);
+                        const parsedPassword = decodeURIComponent(parsed.password);
+                        const parsedHost = parsed.hostname;
+                        const parsedPort = parsed.port || (type === "postgres" ? "5432" : "3306");
+                        const parsedDatabase = parsed.pathname.replace(/^\//, "");
+                        
+                        if (parsedUser) setUser(parsedUser);
+                        if (parsedPassword) setPassword(parsedPassword);
+                        if (parsedHost) setHost(parsedHost);
+                        if (parsedPort) setPort(parsedPort);
+                        if (parsedDatabase) setDatabase(parsedDatabase);
+                        
+                        // Check for SSL in query string
+                        const sslMode = parsed.searchParams.get("sslmode");
+                        if (sslMode === "require" || sslMode === "verify-full" || sslMode === "verify-ca") {
+                          setSsl(true);
+                        }
+                        
+                        // Auto-set name if empty
+                        if (!name && parsedHost) {
+                          setName(`${type === "postgres" ? "PostgreSQL" : "MySQL"} - ${parsedHost}`);
+                        }
+                      } catch (err) {
+                        console.error("Failed to parse connection string:", err);
+                        alert("Could not parse connection string. Please check the format and try again.");
+                      }
+                    }}
+                  >
+                    Parse
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Paste a connection URL and click Parse to auto-fill the fields below
+                </p>
+              </div>
+              
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="host">Host</Label>

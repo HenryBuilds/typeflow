@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Database, Plus, Key } from "lucide-react";
+import { Database, Plus, Key, Edit, Trash2, Settings } from "lucide-react";
 
 type DatabaseType = "postgres" | "mysql" | "mongodb" | "redis";
 
@@ -44,6 +44,7 @@ interface DatabaseNodeDialogProps {
   initialLabel?: string;
   onSave: (data: { label: string; config: Record<string, unknown> }) => void;
   onAddCredential?: () => void;
+  onEditCredential?: (credentialId: string) => void;
   // Input data from previous nodes for expression suggestions
   inputData?: Record<string, unknown>;
   sourceNodeLabels?: string[];
@@ -107,6 +108,7 @@ export function DatabaseNodeDialog({
   initialLabel,
   onSave,
   onAddCredential,
+  onEditCredential,
   inputData,
   sourceNodeLabels,
 }: DatabaseNodeDialogProps) {
@@ -124,11 +126,24 @@ export function DatabaseNodeDialog({
   const [value, setValue] = useState(initialConfig?.value || "");
   const [field, setField] = useState(initialConfig?.field || "");
 
+  const utils = trpc.useUtils();
+
   // Fetch credentials
   const { data: credentials } = trpc.credentials.list.useQuery(
     { organizationId },
     { enabled: open }
   );
+
+  // Delete credential mutation
+  const deleteMutation = trpc.credentials.delete.useMutation({
+    onSuccess: () => {
+      utils.credentials.list.invalidate({ organizationId });
+      // If the deleted credential was selected, clear selection
+      if (credentialId && !filteredCredentials.find(c => c.id === credentialId)) {
+        setCredentialId("");
+      }
+    },
+  });
 
   // Filter credentials by database type
   const filteredCredentials = credentials?.filter(c => c.type === databaseType) || [];
@@ -220,33 +235,85 @@ export function DatabaseNodeDialog({
 
           {/* Credential Selection */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              Credential
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <Key className="h-4 w-4" />
+                Credential
+              </Label>
+              <Button variant="outline" size="sm" onClick={onAddCredential}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add New
+              </Button>
+            </div>
+            
             {filteredCredentials.length === 0 ? (
-              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                <span className="text-sm text-muted-foreground">
+              <div className="p-4 bg-muted rounded-lg text-center">
+                <Database className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
                   No {DATABASE_LABELS[databaseType]} credentials found.
-                </span>
-                <Button variant="outline" size="sm" className="ml-auto" onClick={onAddCredential}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Credential
-                </Button>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Click "Add New" to create your first credential.
+                </p>
               </div>
             ) : (
-              <Select value={credentialId} onValueChange={setCredentialId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select credential..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredCredentials.map((cred) => (
-                    <SelectItem key={cred.id} value={cred.id}>
-                      {cred.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                {filteredCredentials.map((cred) => (
+                  <div
+                    key={cred.id}
+                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                      credentialId === cred.id 
+                        ? 'bg-primary/10 border-primary' 
+                        : 'bg-muted/50 border-transparent hover:bg-muted'
+                    }`}
+                    onClick={() => setCredentialId(cred.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        checked={credentialId === cred.id}
+                        onChange={() => setCredentialId(cred.id)}
+                        className="w-4 h-4"
+                      />
+                      <div>
+                        <span className="font-medium text-sm">{cred.name}</span>
+                        {cred.description && (
+                          <p className="text-xs text-muted-foreground">{cred.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditCredential?.(cred.id);
+                        }}
+                        title="Edit credential"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete credential "${cred.name}"?`)) {
+                            deleteMutation.mutate({ organizationId, credentialId: cred.id });
+                          }
+                        }}
+                        title="Delete credential"
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 

@@ -106,6 +106,7 @@ export default function WorkflowEditorPage() {
   const [editingWorkflowOutputNode, setEditingWorkflowOutputNode] = useState<Node | null>(null);
   
   const [credentialsDialogOpen, setCredentialsDialogOpen] = useState(false);
+  const [editingCredentialId, setEditingCredentialId] = useState<string | null>(null);
   const [workflowVariablesDialogOpen, setWorkflowVariablesDialogOpen] = useState(false);
 
   // Data transformation node dialogs
@@ -2158,6 +2159,11 @@ export default function WorkflowEditorPage() {
               initialLabel={editingDatabaseNode?.data?.label}
               initialConfig={editingDatabaseNode?.data?.config}
               onAddCredential={() => {
+                setEditingCredentialId(null);
+                setCredentialsDialogOpen(true);
+              }}
+              onEditCredential={(credentialId) => {
+                setEditingCredentialId(credentialId);
                 setCredentialsDialogOpen(true);
               }}
               onSave={(data) => {
@@ -3365,9 +3371,12 @@ export default function WorkflowEditorPage() {
       )}
       <CredentialDialog
         open={credentialsDialogOpen}
-        onOpenChange={setCredentialsDialogOpen}
+        onOpenChange={(open) => {
+          setCredentialsDialogOpen(open);
+          if (!open) setEditingCredentialId(null);
+        }}
         organizationId={organizationId}
-        workflowId={workflowId}
+        credentialId={editingCredentialId}
       />
 
       <WorkflowVariablesDialog
