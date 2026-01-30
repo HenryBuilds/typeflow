@@ -310,11 +310,6 @@ export interface INodePackageJson {
     credentials?: string[];
     nodes?: string[];
   };
-  typeflow?: {
-    typeflowNodesApiVersion?: number;
-    credentials?: string[];
-    nodes?: string[];
-  };
 }
 
 // ==================== Node Registration ====================
