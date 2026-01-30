@@ -9,7 +9,7 @@ import {
   IAuthenticateGeneric,
   ICredentialType,
   INodeProperties,
-} from '../types/typeflow-workflow';
+} from '../types/workflow-types';
 
 export class ExampleApi implements ICredentialType {
   // Internal name used in node's credential definition

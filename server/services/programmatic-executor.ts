@@ -14,7 +14,7 @@ import type {
   INode,
   IBinaryData,
   NodeParameterValue,
-} from '@/types/typeflow-workflow';
+} from '@/types/workflow-types';
 import type { ExecutionItem } from '@/types/execution';
 import { credentialService } from './credential-service';
 

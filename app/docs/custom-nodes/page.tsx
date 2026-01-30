@@ -203,7 +203,7 @@ npm run build`}
 ├── package.json          # Package config with 'typeflow' section
 ├── tsconfig.json         # TypeScript configuration
 ├── types/                # Typeflow type definitions
-│   └── typeflow-workflow.ts
+│   └── workflow-types.ts
 ├── credentials/          # Credential definitions
 │   └── MyApi.credentials.ts
 └── nodes/                # Your custom nodes
@@ -247,7 +247,7 @@ npm run build`}
   INodeTypeDescription,
   IExecuteFunctions,
   INodeExecutionData,
-} from '../types/typeflow-workflow';
+} from '../types/workflow-types';
 
 export class MyTransformNode implements INodeType {
   description: INodeTypeDescription = {
@@ -312,7 +312,7 @@ export class MyTransformNode implements INodeType {
                     <CardContent>
                       <CodeBlock 
                         showLineNumbers
-                        code={`import { INodeType, INodeTypeDescription } from '../types/typeflow-workflow';
+                        code={`import { INodeType, INodeTypeDescription } from '../types/workflow-types';
 
 export class GitHubApiNode implements INodeType {
   description: INodeTypeDescription = {
@@ -448,7 +448,7 @@ export class GitHubApiNode implements INodeType {
   ICredentialType,
   INodeProperties,
   IAuthenticateGeneric,
-} from '../types/typeflow-workflow';
+} from '../types/workflow-types';
 
 export class MyApiCredentials implements ICredentialType {
   name = 'myApiCredentials';

@@ -18,7 +18,7 @@ import {
   INodeTypeDescription,
   IExecuteFunctions,
   INodeExecutionData,
-} from '../../types/typeflow-workflow';
+} from '../../types/workflow-types';
 
 export class DataTransformNode implements INodeType {
   description: INodeTypeDescription = {

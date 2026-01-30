@@ -15,7 +15,7 @@ import type {
   ILoadedNode,
   ILoadedCredential,
   INodePackageJson,
-} from '@/types/typeflow-workflow';
+} from '@/types/workflow-types';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('NodeLoader');

@@ -12,7 +12,7 @@ import type {
   INodeExecutionData,
   INodePropertyRouting,
   NodeParameterValue,
-} from '@/types/typeflow-workflow';
+} from '@/types/workflow-types';
 import type { ExecutionItem } from '@/types/execution';
 import { createLogger } from '@/lib/logger';
 

@@ -3,7 +3,7 @@ import {
   INodeExecutionData,
   INodeType,
   INodeTypeDescription,
-} from '../../types/typeflow-workflow';
+} from '../../types/workflow-types';
 
 export class Postgres implements INodeType {
   description: INodeTypeDescription = {

@@ -1,7 +1,7 @@
 import {
   ICredentialType,
   INodeProperties,
-} from '../types/typeflow-workflow';
+} from '../types/workflow-types';
 
 export class Postgres implements ICredentialType {
   name = 'postgres';

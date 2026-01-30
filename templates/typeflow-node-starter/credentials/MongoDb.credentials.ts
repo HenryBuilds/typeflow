@@ -1,7 +1,7 @@
 import {
   ICredentialType,
   INodeProperties,
-} from '../types/typeflow-workflow';
+} from '../types/workflow-types';
 
 export class MongoDb implements ICredentialType {
   name = 'mongoDb';

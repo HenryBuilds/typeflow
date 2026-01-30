@@ -12,7 +12,7 @@
  * - Parsing responses
  */
 
-import { INodeType, INodeTypeDescription } from '../../types/typeflow-workflow';
+import { INodeType, INodeTypeDescription } from '../../types/workflow-types';
 
 export class HttpRequestNode implements INodeType {
   description: INodeTypeDescription = {

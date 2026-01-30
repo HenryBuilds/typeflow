@@ -3,7 +3,7 @@ import {
   INodeExecutionData,
   INodeType,
   INodeTypeDescription,
-} from '../../types/typeflow-workflow';
+} from '../../types/workflow-types';
 
 export class MongoDb implements INodeType {
   description: INodeTypeDescription = {
