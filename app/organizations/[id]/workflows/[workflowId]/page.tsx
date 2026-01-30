@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search, Lock } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search, Lock, Database } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -43,6 +43,7 @@ import {
   EditFieldsNodeDialog,
   HttpRequestNodeDialog,
   ExternalNodeDialog,
+  DatabaseNodeDialog,
 } from "@/components/nodes/dialogs";
 import { useSaveWorkflow, useWorkflow, useUpdateWorkflow } from "@/hooks/use-workflows";
 import { usePackages } from "@/hooks/use-packages";
@@ -133,6 +134,10 @@ export default function WorkflowEditorPage() {
   // External node dialog
   const [externalNodeDialogOpen, setExternalNodeDialogOpen] = useState(false);
   const [editingExternalNode, setEditingExternalNode] = useState<Node | null>(null);
+  // Database node dialog
+  const [databaseDialogOpen, setDatabaseDialogOpen] = useState(false);
+  const [editingDatabaseNode, setEditingDatabaseNode] = useState<Node | null>(null);
+  const [editingDatabaseType, setEditingDatabaseType] = useState<"postgres" | "mysql" | "mongodb" | "redis">("postgres");
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [debugStateDialogOpen, setDebugStateDialogOpen] = useState(false);
   const [workflowLogs, setWorkflowLogs] = useState<WorkflowLog[]>([]);
@@ -1768,6 +1773,100 @@ export default function WorkflowEditorPage() {
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Workflow Output</span>
                         <p className="text-xs text-muted-foreground truncate">Returns data</p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                </div>
+                )}
+              </div>
+              )}
+
+              {/* Data Section - Databases */}
+              {(!nodeSearch || ["postgres", "mysql", "mongodb", "redis", "database"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
+              <div className="mb-4">
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, data: !prev.data }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Data</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.data ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.data && (
+                <div className="space-y-1.5">
+                  {matchesSearch("postgres") && (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "postgres");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+                        <Database className="h-4 w-4 text-blue-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">PostgreSQL</span>
+                        <p className="text-xs text-muted-foreground truncate">SQL database</p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                  {matchesSearch("mysql") && (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "mysql");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
+                        <Database className="h-4 w-4 text-orange-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">MySQL</span>
+                        <p className="text-xs text-muted-foreground truncate">SQL database</p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                  {matchesSearch("mongodb") && (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "mongodb");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
+                        <Database className="h-4 w-4 text-green-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">MongoDB</span>
+                        <p className="text-xs text-muted-foreground truncate">NoSQL database</p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                  {matchesSearch("redis") && (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "redis");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-red-500/10 flex items-center justify-center group-hover:bg-red-500/20 transition-colors">
+                        <Database className="h-4 w-4 text-red-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Redis</span>
+                        <p className="text-xs text-muted-foreground truncate">Key-value store</p>
                       </div>
                     </div>
                   </div>

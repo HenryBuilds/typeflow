@@ -10,3 +10,4 @@ export { SummarizeNodeDialog } from "./summarize-node-dialog";
 export { EditFieldsNodeDialog } from "./edit-fields-node-dialog";
 export { HttpRequestNodeDialog } from "./http-request-node-dialog";
 export { ExternalNodeDialog } from "./external-node-dialog";
+export { DatabaseNodeDialog } from "../../database-node-dialog";

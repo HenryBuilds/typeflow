@@ -43,6 +43,10 @@ import { ManualTriggerNode } from "./nodes/manual-trigger-node";
 import { ChatTriggerNode } from "./nodes/chat-trigger-node";
 import { WorkflowTriggerNode } from "./nodes/workflow-trigger-node";
 import { CustomNode } from "./nodes/custom-node";
+import { PostgresNode } from "./nodes/postgres-node";
+import { MySQLNode } from "./nodes/mysql-node";
+import { MongoDBNode } from "./nodes/mongodb-node";
+import { RedisNode } from "./nodes/redis-node";
 import { CodeEditorDialog } from "./code-editor-dialog";
 import { DeletableEdge } from "./deletable-edge";
 import { Workflow, WorkflowNode as WorkflowNodeType, WorkflowConnection } from "@/types/domain";
@@ -74,6 +78,10 @@ const nodeTypes: NodeTypes = {
   chatTrigger: ChatTriggerNode,
   workflowTrigger: WorkflowTriggerNode,
   externalNode: CustomNode,
+  postgres: PostgresNode,
+  mysql: MySQLNode,
+  mongodb: MongoDBNode,
+  redis: RedisNode,
 };
 
 const edgeTypes = {
@@ -128,6 +136,7 @@ interface WorkflowEditorProps {
   onScheduleTriggerEdit?: (nodeId: string, node: Node) => void;
   onChatTriggerEdit?: (nodeId: string, node: Node) => void;
   onExternalNodeEdit?: (nodeId: string, node: Node) => void;
+  onDatabaseNodeEdit?: (nodeId: string, node: Node, dbType: "postgres" | "mysql" | "mongodb" | "redis") => void;
   // External nodes from node loader
   externalNodes?: Array<{
     name: string;
@@ -188,6 +197,7 @@ export function WorkflowEditor({
   onScheduleTriggerEdit,
   onChatTriggerEdit,
   onExternalNodeEdit,
+  onDatabaseNodeEdit,
   externalNodes = [],
   // Debug mode props
   debugMode = false,
@@ -921,6 +931,28 @@ export function WorkflowEditor({
             executionStatus,
             errorMessage,
             // Debug props
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
+          },
+        };
+      }
+      // Database nodes
+      if (node.type === "postgres" || node.type === "mysql" || node.type === "mongodb" || node.type === "redis") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onDatabaseNodeEdit) {
+                onDatabaseNodeEdit(nodeId, node, node.type as "postgres" | "mysql" | "mongodb" | "redis");
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
             hasBreakpoint: breakpoints.has(node.id),
             isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
             onToggleBreakpoint,
