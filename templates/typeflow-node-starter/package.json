@@ -29,11 +29,15 @@
   "typeflow": {
     "nodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/ExampleApi.credentials.js"
+      "dist/credentials/ExampleApi.credentials.js",
+      "dist/credentials/Postgres.credentials.js",
+      "dist/credentials/MongoDb.credentials.js"
     ],
     "nodes": [
       "dist/nodes/HttpRequest/HttpRequest.node.js",
-      "dist/nodes/DataTransform/DataTransform.node.js"
+      "dist/nodes/DataTransform/DataTransform.node.js",
+      "dist/nodes/Postgres/Postgres.node.js",
+      "dist/nodes/MongoDb/MongoDb.node.js"
     ]
   },
   "devDependencies": {
