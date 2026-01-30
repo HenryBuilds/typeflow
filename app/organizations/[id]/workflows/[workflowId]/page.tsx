@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search, Lock } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -28,6 +28,8 @@ import { ExecutionsPanel } from "@/components/executions-panel";
 import { ExecuteWorkflowDialog } from "@/components/execute-workflow-dialog";
 import { WorkflowInputDialog } from "@/components/workflow-input-dialog";
 import { WorkflowOutputDialog } from "@/components/workflow-output-dialog";
+import { CredentialDialog } from "@/components/credential-dialog";
+import { WorkflowVariablesDialog } from "@/components/workflow-variables-dialog";
 import {
   FilterNodeDialog,
   LimitNodeDialog,
@@ -101,6 +103,10 @@ export default function WorkflowEditorPage() {
   const [editingWorkflowInputNode, setEditingWorkflowInputNode] = useState<Node | null>(null);
   const [workflowOutputDialogOpen, setWorkflowOutputDialogOpen] = useState(false);
   const [editingWorkflowOutputNode, setEditingWorkflowOutputNode] = useState<Node | null>(null);
+  
+  const [credentialsDialogOpen, setCredentialsDialogOpen] = useState(false);
+  const [workflowVariablesDialogOpen, setWorkflowVariablesDialogOpen] = useState(false);
+
   // Data transformation node dialogs
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [editingFilterNode, setEditingFilterNode] = useState<Node | null>(null);
@@ -903,6 +909,26 @@ export default function WorkflowEditorPage() {
             <Package className="h-4 w-4 mr-2" />
             Packages
           </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCredentialsDialogOpen(true)}
+            title="Manage Credentials"
+          >
+            <Lock className="h-4 w-4 mr-2" />
+            Credentials
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setWorkflowVariablesDialogOpen(true)}
+            title="Manage Environment Variables"
+          >
+            <Zap className="h-4 w-4 mr-2" />
+            Variables
+          </Button>
           
           {/* Debug Tools */}
           <div className="flex items-center gap-2 border-l pl-2 ml-2">
@@ -1168,7 +1194,7 @@ export default function WorkflowEditorPage() {
                 </div>
               </div>
               {/* Triggers Section */}
-              {(!nodeSearch || ["trigger", "webhook", "manual trigger", "schedule", "chat trigger"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
+              {(!nodeSearch || ["trigger", "webhook", "manual trigger", "schedule", "chat trigger", "trigger by workflow"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
               <div className="mb-4">
                 <button 
                   type="button"
@@ -1271,6 +1297,25 @@ export default function WorkflowEditorPage() {
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium block">Chat Trigger</span>
                         <p className="text-xs text-muted-foreground truncate">On chat message</p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                  {matchesSearch("trigger by workflow") && (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "workflowTrigger");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <GitBranch className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Trigger by Workflow</span>
+                        <p className="text-xs text-muted-foreground truncate">Called by another workflow</p>
                       </div>
                     </div>
                   </div>
@@ -3180,6 +3225,19 @@ export default function WorkflowEditorPage() {
           </DialogContent>
         </Dialog>
       )}
+      <CredentialDialog
+        open={credentialsDialogOpen}
+        onOpenChange={setCredentialsDialogOpen}
+        organizationId={organizationId}
+        workflowId={workflowId}
+      />
+
+      <WorkflowVariablesDialog
+        open={workflowVariablesDialogOpen}
+        onOpenChange={setWorkflowVariablesDialogOpen}
+        organizationId={organizationId}
+        workflowId={workflowId}
+      />
     </div>
   );
 }

@@ -92,7 +92,7 @@ export function ExecuteWorkflowDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <GitBranch className="h-5 w-5 text-purple-500" />
+            <GitBranch className="h-5 w-5 text-primary" />
             Configure Execute Workflow
           </DialogTitle>
         </DialogHeader>
@@ -151,14 +151,14 @@ export function ExecuteWorkflowDialog({
                       onClick={() => setSelectedWorkflowId(workflow.id)}
                       className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
                         selectedWorkflowId === workflow.id
-                          ? "bg-purple-100 dark:bg-purple-900/30 border border-purple-300 dark:border-purple-700"
+                          ? "bg-primary/10 dark:bg-primary/20 border border-primary/50 dark:border-primary/40"
                           : "hover:bg-muted border border-transparent"
                       }`}
                     >
                       <div className="flex items-center gap-2">
                         <GitBranch className={`h-4 w-4 ${
                           selectedWorkflowId === workflow.id
-                            ? "text-purple-600 dark:text-purple-400"
+                            ? "text-primary"
                             : "text-muted-foreground"
                         }`} />
                         <div className="flex-1 min-w-0">
@@ -193,12 +193,12 @@ export function ExecuteWorkflowDialog({
                 onClick={() => setMode("once")}
                 className={`w-full flex items-start gap-3 p-3 rounded-md border transition-colors text-left ${
                   mode === "once"
-                    ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                    ? "border-primary bg-primary/10 dark:bg-primary/20"
                     : "border-border hover:bg-muted/50"
                 }`}
               >
                 <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  mode === "once" ? "border-purple-500 bg-purple-500" : "border-muted-foreground"
+                  mode === "once" ? "border-primary bg-primary" : "border-muted-foreground"
                 }`}>
                   {mode === "once" && <Check className="h-2.5 w-2.5 text-white" />}
                 </div>
@@ -214,12 +214,12 @@ export function ExecuteWorkflowDialog({
                 onClick={() => setMode("foreach")}
                 className={`w-full flex items-start gap-3 p-3 rounded-md border transition-colors text-left ${
                   mode === "foreach"
-                    ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                    ? "border-primary bg-primary/10 dark:bg-primary/20"
                     : "border-border hover:bg-muted/50"
                 }`}
               >
                 <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  mode === "foreach" ? "border-purple-500 bg-purple-500" : "border-muted-foreground"
+                  mode === "foreach" ? "border-primary bg-primary" : "border-muted-foreground"
                 }`}>
                   {mode === "foreach" && <Check className="h-2.5 w-2.5 text-white" />}
                 </div>
@@ -241,7 +241,7 @@ export function ExecuteWorkflowDialog({
           <Button
             onClick={handleSave}
             disabled={!selectedWorkflowId}
-            className="bg-purple-600 hover:bg-purple-700"
+            className="bg-primary hover:bg-primary/90"
           >
             Save Configuration
           </Button>

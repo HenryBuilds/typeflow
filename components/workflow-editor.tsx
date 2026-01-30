@@ -41,6 +41,7 @@ import { NoopNode } from "./nodes/noop-node";
 import { ScheduleTriggerNode } from "./nodes/schedule-trigger-node";
 import { ManualTriggerNode } from "./nodes/manual-trigger-node";
 import { ChatTriggerNode } from "./nodes/chat-trigger-node";
+import { WorkflowTriggerNode } from "./nodes/workflow-trigger-node";
 import { CustomNode } from "./nodes/custom-node";
 import { CodeEditorDialog } from "./code-editor-dialog";
 import { DeletableEdge } from "./deletable-edge";
@@ -71,6 +72,7 @@ const nodeTypes: NodeTypes = {
   scheduleTrigger: ScheduleTriggerNode,
   manualTrigger: ManualTriggerNode,
   chatTrigger: ChatTriggerNode,
+  workflowTrigger: WorkflowTriggerNode,
   externalNode: CustomNode,
 };
 
@@ -1104,6 +1106,7 @@ export function WorkflowEditor({
         scheduleTrigger: "Schedule",
         manualTrigger: "Manual Trigger",
         chatTrigger: "Chat Trigger",
+        workflowTrigger: "Trigger by Workflow",
       };
       const baseLabel = labelMap[type] || "Node";
       const uniqueLabel = generateUniqueLabel(baseLabel, nodes);

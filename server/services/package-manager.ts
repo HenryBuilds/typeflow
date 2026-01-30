@@ -6,7 +6,9 @@ import { db } from "@/db/db";
 import { packages } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getPackageTypeFallback } from "@/lib/package-type-fallbacks";
+import { createLogger } from "@/lib/logger";
 
+const log = createLogger('PackageManager');
 const execAsync = promisify(exec);
 
 export interface PackageInfo {
@@ -94,7 +96,7 @@ export class PackageManager {
         repository: pkg.links?.repository,
       }));
     } catch (error) {
-      console.error("Error searching packages:", error);
+      log.error({ err: error, query }, 'Error searching packages');
       return [];
     }
   }
@@ -115,7 +117,7 @@ export class PackageManager {
         devDependencies: info.devDependencies,
       };
     } catch (error) {
-      console.error(`Error getting package info for ${packageName}:`, error);
+      log.error({ err: error, packageName }, 'Error getting package info');
       return null;
     }
   }
@@ -171,7 +173,7 @@ export class PackageManager {
       
       return null;
     } catch (error) {
-      console.error(`Error extracting type definitions for ${packageName}:`, error);
+      log.error({ err: error, packageName }, 'Error extracting type definitions');
       return null;
     }
   }
@@ -263,7 +265,7 @@ export class PackageManager {
         packageInfo,
       };
     } catch (error: any) {
-      console.error(`Error installing package ${packageName}:`, error);
+      log.error({ err: error, organizationId, packageName }, 'Error installing package');
       return {
         success: false,
         error: error.message || "Failed to install package",
@@ -316,7 +318,7 @@ export class PackageManager {
 
       return { success: true };
     } catch (error: any) {
-      console.error(`Error uninstalling package ${packageName}:`, error);
+      log.error({ err: error, organizationId, packageName }, 'Error uninstalling package');
       return {
         success: false,
         error: error.message || "Failed to uninstall package",

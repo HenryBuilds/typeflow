@@ -6,6 +6,9 @@ import { Client as PgClient } from "pg";
 import mysql from "mysql2/promise";
 import { MongoClient } from "mongodb";
 import { createClient as createRedisClient } from "redis";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger('CredentialService');
 
 // Type definitions for different credential configs
 export interface PostgresConfig {
@@ -206,7 +209,7 @@ export class CredentialService {
         this.clientCache.set(cacheKey, client);
         credentialClients[cred.name] = client;
       } catch (error) {
-        console.error(`Failed to initialize credential ${cred.name}:`, error);
+        log.error({ err: error, credential: cred.name }, 'Failed to initialize credential');
       }
     }
 
@@ -233,7 +236,7 @@ export class CredentialService {
       try {
         await client.disconnect();
       } catch (error) {
-        console.error('Error disconnecting client:', error);
+        log.error({ err: error }, 'Error disconnecting client');
       }
     }
     this.clientCache.clear();

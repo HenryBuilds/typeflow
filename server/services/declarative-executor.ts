@@ -14,6 +14,9 @@ import type {
   NodeParameterValue,
 } from '@/types/typeflow-workflow';
 import type { ExecutionItem } from '@/types/execution';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('DeclarativeExecutor');
 
 export class DeclarativeNodeExecutor {
   /**
@@ -188,7 +191,7 @@ export class DeclarativeNodeExecutor {
       const result = evalFunc($value, $json, $itemIndex, $parameter);
       return String(result);
     } catch (error) {
-      console.warn(`[DeclarativeExecutor] Expression evaluation failed: ${expression}`, error);
+      log.warn({ err: error, expression }, 'Expression evaluation failed');
       return expression;
     }
   }

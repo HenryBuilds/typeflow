@@ -23,6 +23,7 @@ interface CodeEditorDialogProps {
   onOpenChange: (open: boolean) => void;
   nodeId: string;
   organizationId?: string; // Organization ID for loading credentials
+  workflowId?: string; // Workflow ID for loading scoped credentials
   initialCode?: string;
   initialLabel?: string;
   inputData?: Array<{
@@ -48,6 +49,7 @@ export function CodeEditorDialog({
   onOpenChange,
   nodeId,
   organizationId,
+  workflowId,
   initialCode = "",
   initialLabel = "Code Node",
   inputData,
@@ -66,9 +68,15 @@ export function CodeEditorDialog({
 
   // Load credentials for autocomplete
   const { data: credentials } = trpc.credentials.list.useQuery(
-    { organizationId: organizationId! },
+    { organizationId: organizationId!, workflowId },
     { enabled: !!organizationId && open }
   );
+
+  const { data: environments } = trpc.environments.list.useQuery(
+    { organizationId: organizationId!, workflowId },
+    { enabled: !!organizationId && open }
+  );
+  
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
   const [editorHeight, setEditorHeight] = useState(700);
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
@@ -417,15 +425,37 @@ export function CodeEditorDialog({
     );
   };
 
-  // Available variables for autocomplete and drag & drop
   const availableVariables = useMemo(() => {
     const credentialsList = credentials?.map(c => c.name).join(", ") || "No credentials available";
+    const envList = environments?.map(e => e.key).join(", ") || "No environment variables available";
+    
+    // Explicit list of credentials as individual variables for the sidebar
+    const credentialVars = (credentials || []).map(c => ({
+      name: `$credentials.${c.name}`,
+      description: `Type: ${c.type}`,
+      example: `$credentials.${c.name}`,
+      value: undefined,
+      type: "object",
+    }));
+
+    // Explicit list of env vars
+    const envVars = (environments || []).map(e => ({
+      name: `$env.${e.key}`,
+      description: e.description || "Environment Variable",
+      example: `$env.${e.key}`,
+      value: e.isSecret ? "******" : e.value,
+      type: "string",
+    }));
+
     const baseVars = [
       { name: "$credentials", description: `Available: ${credentialsList}`, example: "$credentials.MyDatabase.query(...)", value: undefined, type: "object" },
+      { name: "$env", description: `Available: ${envList}`, example: "$env.API_KEY", value: undefined, type: "object" },
       { name: "$json", description: "First item's json from previous node", example: "$json.fieldName", value: undefined, type: "object" },
       { name: "$input", description: "Array of all items from previous node", example: "$input.map(...)", value: undefined, type: "array" },
       { name: "$inputItem", description: "Alias for $json", example: "$inputItem.fieldName", value: undefined, type: "object" },
       { name: "$inputAll", description: "Alias for $input", example: "$inputAll.length", value: undefined, type: "array" },
+      ...credentialVars,
+      ...envVars,
     ];
     
     // Add utilities variables
@@ -453,7 +483,7 @@ export function CodeEditorDialog({
     }));
     
     return [...baseVars, ...utilityVars, ...fieldVars];
-  }, [inputFields, credentials, utilities]);
+  }, [inputFields, credentials, environments, utilities]);
 
   // Type definition for parsed types
   type ParsedType = {
@@ -712,6 +742,18 @@ declare const $credentials: $Credentials;
 `;
       parts.push(credentialTypes);
     }
+
+    // Add environment variables type definitions
+    if (environments && environments.length > 0) {
+      const envTypes = `
+// Environment Variables
+interface $Env {
+${environments.map(e => `  /** ${e.description || 'Environment Variable'} */\n  ${e.key}: string;`).join('\n')}
+}
+declare const $env: $Env;
+`;
+      parts.push(envTypes);
+    }
     
     // Add utilities type definitions
     if (utilities && utilities.length > 0) {
@@ -732,7 +774,7 @@ ${utilities.map(util => {
     }
     
     return parts.join('\n\n');
-  }, [typeDefinitions, packageTypeDefinitions, credentials, utilities]);
+  }, [typeDefinitions, packageTypeDefinitions, credentials, environments, utilities]);
 
   // Create TypeScript linter with combined type definitions
   const typeScriptLinter = useMemo(() => {
@@ -1273,6 +1315,28 @@ ${utilities.map(util => {
               { label: 'find', type: 'method', info: 'Find item' },
               { label: 'forEach', type: 'method', info: 'Iterate over items' }
             );
+          } else if (varName === '$env') {
+            // Show environment variables
+            if (environments) {
+              environments.forEach(env => {
+                properties.push({
+                  label: env.key,
+                  type: 'property',
+                  info: `Value: ${env.isSecret ? '******' : env.value}`
+                });
+              });
+            }
+          } else if (varName === '$credentials') {
+            // Show credentials
+            if (credentials) {
+              credentials.forEach(cred => {
+                properties.push({
+                  label: cred.name,
+                  type: 'property',
+                  info: `Type: ${cred.type}`
+                });
+              });
+            }
           }
           
           if (properties.length === 0) return null;
@@ -1452,7 +1516,7 @@ ${utilities.map(util => {
         },
       ],
     });
-  }, [availableVariables, buildTree, allTypes, definedTypes, packageTypes, installedPackages, credentials]);
+  }, [availableVariables, buildTree, allTypes, definedTypes, packageTypes, installedPackages, credentials, environments, sourceNodeLabels]);
 
   useEffect(() => {
     if (open) {
@@ -1646,7 +1710,7 @@ ${utilities.map(util => {
                                   }}
                                   title={`Insert $${utility.label}.${funcName}()`}
                                 >
-                                  <div className="text-purple-600 dark:text-purple-400 font-mono">f</div>
+                                  <div className="text-primary font-mono">f</div>
                                   <code className="font-mono text-foreground">{funcName}</code>
                                 </div>
                               ))}

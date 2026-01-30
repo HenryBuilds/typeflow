@@ -2,7 +2,7 @@ import { z } from "zod";
 import { organizationProcedure, router } from "../trpc";
 import { db } from "@/db/db";
 import { credentials } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { encryptObject, decryptObject } from "@/lib/encryption";
 import { TRPCError } from "@trpc/server";
 
@@ -45,22 +45,39 @@ const credentialConfigSchema = z.union([
 ]);
 
 export const credentialsRouter = router({
-  list: organizationProcedure.query(async ({ ctx, input }) => {
-    const creds = await db.query.credentials.findMany({
-      where: eq(credentials.organizationId, input.organizationId),
-      orderBy: (credentials, { desc }) => [desc(credentials.createdAt)],
-    });
+  list: organizationProcedure
+    .input(
+      z.object({
+        workflowId: z.string().uuid().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const filters = [eq(credentials.organizationId, input.organizationId)];
+      
+      if (input.workflowId) {
+        filters.push(eq(credentials.workflowId, input.workflowId));
+      } else {
+        // If no workflowId provided, only return organization-level credentials (where workflowId is null)
+        // OR return all? The user explicitly wants "own credentials".
+        // Let's filter for global ones (workflowId is null) to separate them.
+        filters.push(isNull(credentials.workflowId));
+      }
 
-    // Don't send encrypted config to client, just metadata
-    return creds.map((cred) => ({
-      id: cred.id,
-      name: cred.name,
-      type: cred.type,
-      description: cred.description,
-      createdAt: cred.createdAt,
-      updatedAt: cred.updatedAt,
-    }));
-  }),
+      const creds = await db.query.credentials.findMany({
+        where: and(...filters),
+        orderBy: (credentials, { desc }) => [desc(credentials.createdAt)],
+      });
+
+      // Don't send encrypted config to client, just metadata
+      return creds.map((cred) => ({
+        id: cred.id,
+        name: cred.name,
+        type: cred.type,
+        description: cred.description,
+        createdAt: cred.createdAt,
+        updatedAt: cred.updatedAt,
+      }));
+    }),
 
   get: organizationProcedure
     .input(
@@ -90,6 +107,7 @@ export const credentialsRouter = router({
         id: cred.id,
         name: cred.name,
         type: cred.type,
+        workflowId: cred.workflowId,
         description: cred.description,
         config,
         createdAt: cred.createdAt,
@@ -103,6 +121,7 @@ export const credentialsRouter = router({
         name: z.string().min(1).max(255),
         type: z.enum(["postgres", "mysql", "mongodb", "redis"]),
         description: z.string().optional(),
+        workflowId: z.string().uuid().optional(),
         config: credentialConfigSchema,
       })
     )
@@ -114,6 +133,7 @@ export const credentialsRouter = router({
         .insert(credentials)
         .values({
           organizationId: input.organizationId,
+          workflowId: input.workflowId,
           name: input.name,
           type: input.type,
           description: input.description,

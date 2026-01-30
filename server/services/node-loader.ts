@@ -16,6 +16,9 @@ import type {
   ILoadedCredential,
   INodePackageJson,
 } from '@/types/typeflow-workflow';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('NodeLoader');
 
 // Create a require function for ESM context
 // We use a concrete path to avoid Turbopack static analysis issues
@@ -48,7 +51,7 @@ export class NodeLoader {
   async initialize(): Promise<void> {
     if (this.isLoaded) return;
 
-    console.log(`[NodeLoader] Scanning for custom nodes in: ${this.customNodesPath}`);
+    log.info({ path: this.customNodesPath }, 'Scanning for custom nodes');
 
     try {
       await this.ensureCustomNodesDirectory();
@@ -60,9 +63,9 @@ export class NodeLoader {
       }
       
       this.isLoaded = true;
-      console.log(`[NodeLoader] Loaded ${this.loadedNodes.size} custom nodes and ${this.loadedCredentials.size} credentials`);
+      log.info({ nodes: this.loadedNodes.size, credentials: this.loadedCredentials.size }, 'Custom nodes loaded');
     } catch (error) {
-      console.error('[NodeLoader] Error initializing:', error);
+      log.error({ err: error }, 'Error initializing');
     }
   }
 
@@ -76,13 +79,13 @@ export class NodeLoader {
     
     // Check if dist exists (template needs to be built first)
     if (!fs.existsSync(distPath)) {
-      console.log('[NodeLoader] Template package not built. Run "npm run build" in templates/typeflow-node-starter to enable testing.');
+      log.debug('Template package not built. Run "npm run build" in templates/typeflow-node-starter to enable testing.');
       return;
     }
     
     const packageJsonPath = path.join(templatePath, 'package.json');
     if (!fs.existsSync(packageJsonPath)) {
-      console.log('[NodeLoader] Template package.json not found');
+      log.debug('Template package.json not found');
       return;
     }
     
@@ -93,11 +96,11 @@ export class NodeLoader {
       
       const nodeConfig = packageJson.typeflow || packageJson.typeflow;
       if (!nodeConfig) {
-        console.log('[NodeLoader] Template has no typeflow/typeflow configuration');
+        log.debug('Template has no typeflow/typeflow configuration');
         return;
       }
       
-      console.log('[NodeLoader] Loading template package for development...');
+      log.info('Loading template package for development...');
       
       // Load template nodes
       if (nodeConfig.nodes) {
@@ -113,9 +116,9 @@ export class NodeLoader {
         }
       }
       
-      console.log('[NodeLoader] Template package loaded successfully');
+      log.info('Template package loaded successfully');
     } catch (error) {
-      console.error('[NodeLoader] Error loading template package:', error);
+      log.error({ err: error }, 'Error loading template package');
     }
   }
 
@@ -127,7 +130,7 @@ export class NodeLoader {
     
     if (!fs.existsSync(baseDir)) {
       fs.mkdirSync(baseDir, { recursive: true });
-      console.log(`[NodeLoader] Created custom nodes directory: ${baseDir}`);
+      log.debug({ path: baseDir }, 'Created custom nodes directory');
       
       // Initialize package.json for npm link support
       const packageJsonPath = path.join(baseDir, 'package.json');
@@ -152,15 +155,15 @@ export class NodeLoader {
    */
   private async scanAndLoadPackages(): Promise<void> {
     if (!fs.existsSync(this.customNodesPath)) {
-      console.log(`[NodeLoader] Custom nodes path does not exist: ${this.customNodesPath}`);
+      log.debug({ path: this.customNodesPath }, 'Custom nodes path does not exist');
       return;
     }
 
     const entries = fs.readdirSync(this.customNodesPath, { withFileTypes: true });
-    console.log(`[NodeLoader] Found ${entries.length} entries in node_modules`);
+    log.debug({ count: entries.length }, 'Found entries in node_modules');
 
     for (const entry of entries) {
-      console.log(`[NodeLoader] Entry: ${entry.name}, isDirectory: ${entry.isDirectory()}, isSymbolicLink: ${entry.isSymbolicLink()}`);
+      log.trace({ name: entry.name, isDirectory: entry.isDirectory(), isSymbolicLink: entry.isSymbolicLink() }, 'Checking entry');
       
       // Skip files, but follow symlinks to check if they point to directories
       if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
@@ -176,7 +179,7 @@ export class NodeLoader {
         }
       }
       
-      console.log(`[NodeLoader] Checking package: ${entry.name}`);
+      log.debug({ package: entry.name }, 'Checking package');
 
       // Handle scoped packages (@org/package-name)
       if (entry.name.startsWith('@')) {
@@ -192,7 +195,7 @@ export class NodeLoader {
       } else {
         // Regular packages - look for typeflow-nodes-* or typeflow-nodes-* prefix
         if (entry.name.startsWith('typeflow-nodes-') || entry.name.startsWith('typeflow-nodes-')) {
-          console.log(`[NodeLoader] Package matches prefix: ${entry.name}`);
+          log.debug({ package: entry.name }, 'Package matches prefix');
           await this.loadPackage(path.join(this.customNodesPath, entry.name), entry.name);
         }
       }
@@ -206,7 +209,7 @@ export class NodeLoader {
     const packageJsonPath = path.join(packagePath, 'package.json');
     
     if (!fs.existsSync(packageJsonPath)) {
-      console.warn(`[NodeLoader] No package.json found in ${packagePath}`);
+      log.warn({ path: packagePath }, 'No package.json found');
       return;
     }
 
@@ -218,11 +221,11 @@ export class NodeLoader {
       // Check for typeflow or typeflow node definition (fallback to typeflow for compatibility)
       const nodeConfig = packageJson.typeflow || packageJson.typeflow;
       if (!nodeConfig) {
-        console.warn(`[NodeLoader] Package ${packageName} has no typeflow/typeflow configuration`);
+        log.warn({ package: packageName }, 'Package has no typeflow/typeflow configuration');
         return;
       }
 
-      console.log(`[NodeLoader] Loading package: ${packageName}`);
+      log.info({ package: packageName }, 'Loading package');
 
       // Load nodes
       if (nodeConfig.nodes) {
@@ -239,7 +242,7 @@ export class NodeLoader {
       }
 
     } catch (error) {
-      console.error(`[NodeLoader] Error loading package ${packageName}:`, error);
+      log.error({ err: error, package: packageName }, 'Error loading package');
     }
   }
 
@@ -250,7 +253,7 @@ export class NodeLoader {
     const fullPath = path.join(packagePath, relativeNodePath);
 
     if (!fs.existsSync(fullPath)) {
-      console.warn(`[NodeLoader] Node file not found: ${fullPath}`);
+      log.warn({ path: fullPath }, 'Node file not found');
       return;
     }
 
@@ -276,12 +279,12 @@ export class NodeLoader {
               packageName,
             });
             
-            console.log(`[NodeLoader] Loaded node: ${nodeName} (${instance.description.displayName})`);
+            log.info({ name: nodeName, displayName: instance.description.displayName }, 'Loaded node');
           }
         }
       }
     } catch (error) {
-      console.error(`[NodeLoader] Error loading node ${relativeNodePath}:`, error);
+      log.error({ err: error, node: relativeNodePath }, 'Error loading node');
     }
   }
 
@@ -292,7 +295,7 @@ export class NodeLoader {
     const fullPath = path.join(packagePath, relativeCredPath);
 
     if (!fs.existsSync(fullPath)) {
-      console.warn(`[NodeLoader] Credential file not found: ${fullPath}`);
+      log.warn({ path: fullPath }, 'Credential file not found');
       return;
     }
 
@@ -314,12 +317,12 @@ export class NodeLoader {
               packageName,
             });
             
-            console.log(`[NodeLoader] Loaded credential: ${instance.name} (${instance.displayName})`);
+            log.info({ name: instance.name, displayName: instance.displayName }, 'Loaded credential');
           }
         }
       }
     } catch (error) {
-      console.error(`[NodeLoader] Error loading credential ${relativeCredPath}:`, error);
+      log.error({ err: error, credential: relativeCredPath }, 'Error loading credential');
     }
   }
 

@@ -201,7 +201,7 @@ export function ExternalNodeDialog({
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Puzzle className="h-5 w-5 text-purple-500" />
+            <Puzzle className="h-5 w-5 text-primary" />
             Configure {nodeInfo?.displayName || "External Node"}
           </DialogTitle>
           <DialogDescription>

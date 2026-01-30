@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface CredentialDialogProps {
   organizationId: string;
+  workflowId?: string; // Optional workflow scope
   credentialId?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -22,6 +23,7 @@ interface CredentialDialogProps {
 
 export function CredentialDialog({
   organizationId,
+  workflowId,
   credentialId,
   open,
   onOpenChange,
@@ -163,6 +165,7 @@ export function CredentialDialog({
     } else {
       await createMutation.mutateAsync({
         organizationId,
+        workflowId: workflowId, // Pass workflowId if provided
         name,
         type,
         description,

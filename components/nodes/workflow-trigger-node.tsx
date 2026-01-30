@@ -2,9 +2,8 @@
 
 import { memo, useState } from "react";
 import { Handle, Position, NodeProps } from "reactflow";
-import { Webhook, Play, CheckCircle2, XCircle, Loader2, Trash2, AlertCircle, Copy, ExternalLink } from "lucide-react";
+import { GitBranch, Trash2, CheckCircle2, XCircle, Loader2, AlertCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -13,32 +12,27 @@ import {
 } from "@/components/ui/dialog";
 import { NodeWrapper } from "./node-wrapper";
 
-interface WebhookNodeData {
+interface WorkflowTriggerNodeData {
   label?: string;
-  config?: {
-    path?: string;
-    method?: string;
-    webhookId?: string;
-    [key: string]: unknown;
-  };
-  onEdit?: (nodeId: string) => void;
+  onExecute?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
   isExecuting?: boolean;
   executionStatus?: "pending" | "running" | "completed" | "failed";
   errorMessage?: string;
-  webhookUrl?: string; // Full URL to the webhook endpoint (only set when workflow is active)
-  isWorkflowActive?: boolean; // Whether the workflow is currently active
-  // Debug props
   hasBreakpoint?: boolean;
   isBreakpointActive?: boolean;
   onToggleBreakpoint?: (nodeId: string) => void;
 }
 
-export const WebhookNode = memo(({ data, selected, id }: NodeProps<WebhookNodeData>) => {
+export const WorkflowTriggerNode = memo(({ data, selected, id }: NodeProps<WorkflowTriggerNodeData>) => {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
-  const [copied, setCopied] = useState(false);
-  
-  // Determine border and background color based on execution status
+
+  const handleDoubleClick = () => {
+    if (data.onExecute) {
+      data.onExecute(id);
+    }
+  };
+
   const getStatusStyles = () => {
     if (data.executionStatus === "completed") {
       return "node-card-completed";
@@ -85,39 +79,41 @@ export const WebhookNode = memo(({ data, selected, id }: NodeProps<WebhookNodeDa
     return null;
   };
 
-  const handleCopyUrl = async () => {
-    if (data.webhookUrl) {
-      await navigator.clipboard.writeText(data.webhookUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleDoubleClick = () => {
-    if (data.onEdit) {
-      data.onEdit(id);
-    }
-  };
-
   return (
-    <NodeWrapper
-      nodeId={id}
-      hasBreakpoint={data.hasBreakpoint}
-      isBreakpointActive={data.isBreakpointActive}
-      onToggleBreakpoint={data.onToggleBreakpoint}
-    >
+    <NodeWrapper nodeId={id} hasBreakpoint={data.hasBreakpoint} isBreakpointActive={data.isBreakpointActive} onToggleBreakpoint={data.onToggleBreakpoint}>
       <div
-        className={`px-4 py-2 shadow-md rounded-md border-2 cursor-pointer transition-all duration-200 ${getStatusStyles()}`}
+        className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 min-w-[180px] cursor-pointer ${getStatusStyles()}`}
         onDoubleClick={handleDoubleClick}
-        title="Double-click to configure webhook"
+        title="Triggered by another workflow"
       >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Webhook className="h-4 w-4 text-primary" />
-          <div className="font-bold text-sm">{data.label || "Webhook"}</div>
+          <GitBranch className="h-4 w-4 text-gray-600" />
+          <div>
+            <div className="font-bold text-sm">{data.label || "Trigger by Workflow"}</div>
+            <div className="text-xs text-muted-foreground">
+              Called by another workflow
+            </div>
+          </div>
           {getStatusIcon()}
         </div>
         <div className="flex items-center gap-1">
+          {data.onExecute && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 hover:bg-accent"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onExecute?.(id);
+              }}
+              disabled={data.isExecuting || data.executionStatus === "running"}
+              title="Run workflow"
+            >
+              <Play className={`h-3 w-3 ${data.isExecuting ? 'animate-pulse' : ''}`} />
+            </Button>
+          )}
           {data.onDelete && (
             <Button
               type="button"
@@ -135,75 +131,26 @@ export const WebhookNode = memo(({ data, selected, id }: NodeProps<WebhookNodeDa
           )}
         </div>
       </div>
-      
-      {data.config?.path && (
-        <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
-          <span className="font-mono">{data.config.method || "POST"}</span>
-          <span>/webhook/{data.config.path}</span>
-        </div>
-      )}
 
-      {/* Show inactive status when workflow is not active */}
-      {data.config?.path && !data.isWorkflowActive && (
-        <div className="mt-1">
-          <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-700">
-            Inactive - Activate workflow to enable
-          </Badge>
-        </div>
-      )}
-
-      {data.webhookUrl && (
-        <div className="mt-1 flex items-center gap-1 flex-wrap">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-5 px-2 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCopyUrl();
-            }}
-            title="Copy webhook URL"
-          >
-            <Copy className="h-3 w-3 mr-1" />
-            {copied ? "Copied!" : "Copy URL"}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-5 px-2 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(data.webhookUrl, "_blank");
-            }}
-            title="Open webhook URL"
-          >
-            <ExternalLink className="h-3 w-3" />
-          </Button>
-        </div>
-      )}
-      
       <Handle
         type="source"
         position={Position.Bottom}
-        className="w-3 h-3 !bg-green-500"
+        className="w-3 h-3 !bg-gray-500"
       />
-      
-      {/* Error Details Dialog */}
+
       <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
         <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <AlertCircle className="h-5 w-5" />
-              Execution Error
+              Workflow Trigger Error
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto">
             <div className="space-y-4">
               <div>
                 <h4 className="text-sm font-semibold mb-2">Node:</h4>
-                <p className="text-sm text-muted-foreground">{data.label || "Webhook"}</p>
+                <p className="text-sm text-muted-foreground">{data.label || "Trigger by Workflow"}</p>
               </div>
               <div>
                 <h4 className="text-sm font-semibold mb-2">Error Message:</h4>
@@ -220,4 +167,4 @@ export const WebhookNode = memo(({ data, selected, id }: NodeProps<WebhookNodeDa
   );
 });
 
-WebhookNode.displayName = "WebhookNode";
+WorkflowTriggerNode.displayName = "WorkflowTriggerNode";

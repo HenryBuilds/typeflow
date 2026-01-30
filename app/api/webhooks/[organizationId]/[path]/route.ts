@@ -4,6 +4,9 @@ import { webhooks, workflows, webhookRequests, executions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { WorkflowExecutor } from "@/server/services/workflow-executor";
 import { addWorkflowJob } from "@/lib/queue/workflow-queue";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger('WebhookHandler');
 
 const ENABLE_QUEUE = process.env.ENABLE_WORKER_QUEUE === "true";
 
@@ -56,8 +59,7 @@ async function handleWebhookRequest(
 ) {
   try {
     const { organizationId, path } = params;
-
-    
+    log.info({ organizationId, path, method }, 'Incoming webhook request');
 
     
 
@@ -73,7 +75,7 @@ async function handleWebhookRequest(
     });
 
     if (!webhook) {
-      console.error(`Webhook not found: ${organizationId}/${path}`);
+      log.warn({ organizationId, path }, 'Webhook not found');
       return NextResponse.json(
         { error: "Webhook not found" },
         { status: 404 }
@@ -82,7 +84,7 @@ async function handleWebhookRequest(
 
     // Check if webhook is active
     if (!webhook.isActive) {
-      console.error(`Webhook inactive: ${organizationId}/${path}`);
+      log.warn({ organizationId, path, webhookId: webhook.id }, 'Webhook inactive');
       return NextResponse.json(
         { error: "Webhook is inactive. Please activate the workflow to enable this webhook." },
         { status: 403 }
@@ -91,7 +93,7 @@ async function handleWebhookRequest(
 
     // Check if the associated workflow is active
     if (!webhook.workflow?.isActive) {
-      console.error(`Workflow inactive for webhook: ${organizationId}/${path}`);
+      log.warn({ organizationId, path, workflowId: webhook.workflowId }, 'Workflow inactive for webhook');
       return NextResponse.json(
         { error: "Workflow is inactive. Please activate the workflow to enable this webhook." },
         { status: 403 }
@@ -169,7 +171,7 @@ async function handleWebhookRequest(
         }
       }
     } catch (error) {
-      console.error("Error parsing request body:", error);
+      log.error({ err: error }, 'Error parsing request body');
       body = {};
     }
 
@@ -242,7 +244,7 @@ async function handleWebhookRequest(
       });
       
     } catch (error) {
-      console.error("Error saving webhook request:", error);
+      log.error({ err: error, webhookId: webhook.id }, 'Error saving webhook request');
       // Continue even if saving fails
     }
 
@@ -270,7 +272,7 @@ async function handleWebhookRequest(
           { status: 202 } // 202 Accepted
         );
       } catch (error) {
-        console.error("Error queuing workflow:", error);
+        log.error({ err: error, workflowId: webhook.workflowId }, 'Error queuing workflow');
         return NextResponse.json(
           {
             error: "Failed to queue workflow",
@@ -353,7 +355,7 @@ async function handleWebhookRequest(
 
     return NextResponse.json(responseData, { status: 200 });
   } catch (error) {
-    console.error("Webhook execution error:", error);
+    log.error({ err: error, params }, 'Webhook execution error');
     return NextResponse.json(
       {
         error: "Internal server error",

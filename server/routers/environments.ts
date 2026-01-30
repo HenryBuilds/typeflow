@@ -2,26 +2,44 @@ import { z } from "zod";
 import { router, organizationProcedure } from "../trpc";
 import { db } from "@/db/db";
 import { environments } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 export const environmentsRouter = router({
   // List all environment variables
-  list: organizationProcedure.query(async ({ ctx }) => {
-    return await db.query.environments.findMany({
-      where: eq(environments.organizationId, ctx.organization.id),
-      orderBy: (envs, { asc }) => [asc(envs.key)],
-    });
-  }),
+  list: organizationProcedure
+    .input(z.object({ workflowId: z.string().uuid().optional() }))
+    .query(async ({ ctx, input }) => {
+      const filters = [eq(environments.organizationId, ctx.organization.id)];
+      
+      if (input.workflowId) {
+        filters.push(eq(environments.workflowId, input.workflowId));
+      } else {
+        filters.push(isNull(environments.workflowId));
+      }
+
+      return await db.query.environments.findMany({
+        where: and(...filters),
+        orderBy: (envs, { asc }) => [asc(envs.key)],
+      });
+    }),
 
   // Get environment variable by key
   getByKey: organizationProcedure
-    .input(z.object({ key: z.string() }))
+    .input(z.object({ key: z.string(), workflowId: z.string().uuid().optional() }))
     .query(async ({ ctx, input }) => {
+      const filters = [
+        eq(environments.organizationId, ctx.organization.id),
+        eq(environments.key, input.key),
+      ];
+
+      if (input.workflowId) {
+        filters.push(eq(environments.workflowId, input.workflowId));
+      } else {
+        filters.push(isNull(environments.workflowId));
+      }
+
       const env = await db.query.environments.findFirst({
-        where: and(
-          eq(environments.organizationId, ctx.organization.id),
-          eq(environments.key, input.key)
-        ),
+        where: and(...filters),
       });
 
       if (!env) {
@@ -39,15 +57,24 @@ export const environmentsRouter = router({
         value: z.string(),
         isSecret: z.boolean().default(false),
         description: z.string().optional(),
+        workflowId: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const filters = [
+        eq(environments.organizationId, ctx.organization.id),
+        eq(environments.key, input.key),
+      ];
+
+      if (input.workflowId) {
+        filters.push(eq(environments.workflowId, input.workflowId));
+      } else {
+        filters.push(isNull(environments.workflowId));
+      }
+
       // Check if exists
       const existing = await db.query.environments.findFirst({
-        where: and(
-          eq(environments.organizationId, ctx.organization.id),
-          eq(environments.key, input.key)
-        ),
+        where: and(...filters),
       });
 
       if (existing) {
@@ -69,6 +96,7 @@ export const environmentsRouter = router({
         .insert(environments)
         .values({
           organizationId: ctx.organization.id,
+          workflowId: input.workflowId,
           key: input.key,
           value: input.value,
           isSecret: input.isSecret,
@@ -81,16 +109,22 @@ export const environmentsRouter = router({
 
   // Delete environment variable
   delete: organizationProcedure
-    .input(z.object({ key: z.string() }))
+    .input(z.object({ key: z.string(), workflowId: z.string().uuid().optional() }))
     .mutation(async ({ ctx, input }) => {
+      const filters = [
+        eq(environments.organizationId, ctx.organization.id),
+        eq(environments.key, input.key),
+      ];
+
+      if (input.workflowId) {
+        filters.push(eq(environments.workflowId, input.workflowId));
+      } else {
+        filters.push(isNull(environments.workflowId));
+      }
+
       await db
         .delete(environments)
-        .where(
-          and(
-            eq(environments.organizationId, ctx.organization.id),
-            eq(environments.key, input.key)
-          )
-        );
+        .where(and(...filters));
 
       return { success: true };
     }),

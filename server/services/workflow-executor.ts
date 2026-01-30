@@ -9,6 +9,9 @@ import { declarativeExecutor } from "./declarative-executor";
 import { programmaticExecutor } from "./programmatic-executor";
 import * as Module from "module";
 import * as path from "path";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger('WorkflowExecutor');
 import type {
   DebugExecutionOptions,
   DebugExecutionResult,
@@ -30,6 +33,7 @@ export class WorkflowExecutor {
     targetNodeId: string,
     triggerData?: Record<string, unknown>
   ): Promise<WorkflowExecutionResult> {
+    log.info({ workflowId, organizationId, targetNodeId }, 'Starting executeUntilNode');
     // Get workflow with nodes and connections
     const workflow = await db.query.workflows.findFirst({
       where: and(
@@ -44,6 +48,7 @@ export class WorkflowExecutor {
     });
 
     if (!workflow) {
+      log.error({ workflowId, organizationId }, 'Workflow not found');
       throw new Error("Workflow not found");
     }
 
@@ -86,10 +91,10 @@ export class WorkflowExecutor {
     // Add target node to execution list
     predecessors.add(targetNodeId);
 
-    // Find trigger or webhook node
-    const triggerNode = workflow.nodes.find((n) => n.type === "trigger" || n.type === "webhook") || workflow.nodes[0];
+    // Find trigger, webhook, or workflowTrigger node
+    const triggerNode = workflow.nodes.find((n) => n.type === "trigger" || n.type === "webhook" || n.type === "workflowTrigger") || workflow.nodes[0];
     if (!triggerNode) {
-      throw new Error("No trigger or webhook node found");
+      throw new Error("No trigger node found");
     }
 
     // Pre-execute all utilities nodes to make their functions available
@@ -162,7 +167,7 @@ export class WorkflowExecutor {
       try {
         let inputItems: ExecutionItem[] = [];
 
-        if (currentNode.type === "trigger" || currentNode.type === "webhook") {
+        if (currentNode.type === "trigger" || currentNode.type === "webhook" || currentNode.type === "workflowTrigger") {
           inputItems = triggerData ? [{ json: triggerData }] : [{ json: {} }];
         } else {
           const inputConnections = workflowConnections.filter(c => c.targetNodeId === currentNodeId);
@@ -224,7 +229,7 @@ export class WorkflowExecutor {
         } else if (currentNode.type === "utilities") {
           // Utilities nodes are pre-executed, skip them in the main loop
           continue;
-        } else if (currentNode.type === "manualTrigger" || currentNode.type === "scheduleTrigger" || currentNode.type === "chatTrigger") {
+        } else if (currentNode.type === "manualTrigger" || currentNode.type === "scheduleTrigger" || currentNode.type === "chatTrigger" || currentNode.type === "workflowTrigger") {
           // Trigger nodes - pass through trigger data or empty item
           outputItems = inputItems.length > 0 ? inputItems : [{ json: {} }];
         } else if (currentNode.type === "noop") {
@@ -313,7 +318,7 @@ export class WorkflowExecutor {
       } catch (error) {
         const duration = Date.now() - startTime;
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`Node ${currentNodeId} execution failed:`, errorMessage);
+        log.error({ err: error, nodeId: currentNodeId, duration }, 'Node execution failed');
 
         nodeResults[currentNodeId] = {
           nodeId: currentNodeId,
@@ -342,6 +347,7 @@ export class WorkflowExecutor {
     organizationId: string,
     triggerData?: Record<string, unknown>
   ): Promise<WorkflowExecutionResult> {
+    log.info({ workflowId, organizationId }, 'Starting executeWorkflow');
     // Get workflow with nodes and connections
     const workflow = await db.query.workflows.findFirst({
       where: and(
@@ -356,6 +362,7 @@ export class WorkflowExecutor {
     });
 
     if (!workflow) {
+      log.error({ workflowId, organizationId }, 'Workflow not found');
       throw new Error("Workflow not found");
     }
 
@@ -371,9 +378,9 @@ export class WorkflowExecutor {
     const nodeOutputs = new Map<string, ExecutionItem[]>(); // Array of execution items per node
     const nodeResults: Record<string, NodeExecutionResult> = {};
 
-    // Find trigger or webhook node (first node or node with type "trigger" or "webhook")
+    // Find trigger or webhook node (first node or node with type "trigger", "webhook", or "workflowTrigger")
     const triggerNode =
-      workflow.nodes.find((n) => n.type === "trigger" || n.type === "webhook") || workflow.nodes[0];
+      workflow.nodes.find((n) => n.type === "trigger" || n.type === "webhook" || n.type === "workflowTrigger") || workflow.nodes[0];
 
     if (!triggerNode) {
       throw new Error("No trigger or webhook node found");
@@ -437,7 +444,7 @@ export class WorkflowExecutor {
         let inputItems: ExecutionItem[] = [];
 
         // Convert trigger data to items format
-        if (currentNode.type === "trigger" || currentNode.type === "webhook") {
+        if (currentNode.type === "trigger" || currentNode.type === "webhook" || currentNode.type === "workflowTrigger") {
           inputItems = triggerData ? [{ json: triggerData }] : [{ json: {} }];
         } else {
           // Get input from connected nodes
@@ -514,7 +521,7 @@ export class WorkflowExecutor {
           // Execute a subworkflow
           outputItems = await this.executeSubworkflow(currentNode, inputItems, organizationId);
           
-        } else if (currentNode.type === "manualTrigger" || currentNode.type === "scheduleTrigger" || currentNode.type === "chatTrigger") {
+        } else if (currentNode.type === "manualTrigger" || currentNode.type === "scheduleTrigger" || currentNode.type === "chatTrigger" || currentNode.type === "workflowTrigger") {
           // Trigger nodes - pass through trigger data or empty item
           outputItems = inputItems.length > 0 ? inputItems : [{ json: {} }];
         } else if (currentNode.type === "noop") {
@@ -717,10 +724,10 @@ export class WorkflowExecutor {
     const callStack: DebugStackFrame[] =
       options.previousState?.callStack || [];
 
-    // Find trigger or webhook node
-    const triggerNode = workflow.nodes.find((n) => n.type === "trigger" || n.type === "webhook") || workflow.nodes[0];
+    // Find trigger, webhook, or workflowTrigger node
+    const triggerNode = workflow.nodes.find((n) => n.type === "trigger" || n.type === "webhook" || n.type === "workflowTrigger") || workflow.nodes[0];
     if (!triggerNode) {
-      throw new Error("No trigger or webhook node found");
+      throw new Error("No trigger node found");
     }
 
     // Pre-execute all utilities nodes
@@ -824,7 +831,7 @@ export class WorkflowExecutor {
         // Get input items
         let inputItems: ExecutionItem[] = [];
 
-        if (currentNode.type === "trigger" || currentNode.type === "webhook") {
+        if (currentNode.type === "trigger" || currentNode.type === "webhook" || currentNode.type === "workflowTrigger") {
           inputItems = triggerData ? [{ json: triggerData }] : [{ json: {} }];
         } else {
           const inputConnections = workflowConnections.filter(
@@ -905,7 +912,7 @@ export class WorkflowExecutor {
           continue;
         } else if (currentNode.type === "executeWorkflow") {
           outputItems = await this.executeSubworkflow(currentNode, inputItems, organizationId);
-        } else if (currentNode.type === "manualTrigger" || currentNode.type === "scheduleTrigger" || currentNode.type === "chatTrigger") {
+        } else if (currentNode.type === "manualTrigger" || currentNode.type === "scheduleTrigger" || currentNode.type === "chatTrigger" || currentNode.type === "workflowTrigger") {
           outputItems = inputItems.length > 0 ? inputItems : [{ json: {} }];
         } else if (currentNode.type === "noop") {
           outputItems = inputItems;
@@ -1459,13 +1466,13 @@ ${utilitiesDeclarations}
             // Build safe console first
             const safeConsole = {
               log: (...args: unknown[]) => {
-                
+                log.debug({ args }, 'Node console.log');
               },
               error: (...args: unknown[]) => {
-                console.error("[Node Execution]", ...args);
+                log.error({ args }, 'Node console.error');
               },
               warn: (...args: unknown[]) => {
-                console.warn("[Node Execution]", ...args);
+                log.warn({ args }, 'Node console.warn');
               },
             };
 
@@ -1651,7 +1658,7 @@ ${utilitiesDeclarations}
       try {
         credentials = await credentialService.getCredentials(organizationId) as Record<string, unknown>;
       } catch (error) {
-        console.warn(`Failed to load credentials for custom node`);
+        log.warn({ err: error }, 'Failed to load credentials for custom node');
       }
     }
 
@@ -1691,9 +1698,9 @@ ${utilitiesDeclarations}
       getNodeParameter,
       getCredentials,
       console: {
-        log: (...args: unknown[]) => console.log("[CustomNode]", ...args),
-        error: (...args: unknown[]) => console.error("[CustomNode]", ...args),
-        warn: (...args: unknown[]) => console.warn("[CustomNode]", ...args),
+        log: (...args: unknown[]) => log.debug({ args }, 'CustomNode console.log'),
+        error: (...args: unknown[]) => log.error({ args }, 'CustomNode console.error'),
+        warn: (...args: unknown[]) => log.warn({ args }, 'CustomNode console.warn'),
       },
       JSON,
       Array,

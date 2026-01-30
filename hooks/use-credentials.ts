@@ -1,8 +1,9 @@
 import { trpc } from "@/lib/trpc";
 
-export function useCredentials(organizationId: string) {
+export function useCredentials(organizationId: string, workflowId?: string) {
   return trpc.credentials.list.useQuery({
     organizationId,
+    workflowId,
   });
 }
 

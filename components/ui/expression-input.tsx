@@ -258,7 +258,7 @@ export function ExpressionInput({
             placeholder={isExpressionMode ? "Enter expression (e.g. $json.field)" : placeholder}
             className={cn(
               "font-mono text-sm",
-              isExpressionMode && "bg-purple-500/10 border-purple-500/50"
+              isExpressionMode && "bg-primary/10 border-primary/50"
             )}
           />
           
@@ -334,8 +334,8 @@ export function ExpressionInput({
       
       {/* Expression mode indicator */}
       {isExpressionMode && (
-        <div className="text-xs text-purple-400 mt-1">
-          Expression: <code className="bg-purple-500/20 px-1 rounded">{"={{" + displayValue + "}}"}</code>
+        <div className="text-xs text-primary mt-1">
+          Expression: <code className="bg-primary/20 px-1 rounded">{"={{" + displayValue + "}}"}</code>
         </div>
       )}
     </div>
