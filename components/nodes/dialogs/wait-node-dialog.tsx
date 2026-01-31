@@ -19,11 +19,11 @@ interface WaitNodeDialogProps {
   onOpenChange: (open: boolean) => void;
   nodeId: string;
   initialConfig?: {
-    duration?: number;
+    waitTime?: number;
     unit?: "seconds" | "minutes";
   };
   initialLabel?: string;
-  onSave: (data: { label: string; config: { duration: number; unit: "seconds" | "minutes" } }) => void;
+  onSave: (data: { label: string; config: { waitTime: number; unit: "seconds" | "minutes" } }) => void;
 }
 
 export function WaitNodeDialog({
@@ -35,13 +35,13 @@ export function WaitNodeDialog({
   onSave,
 }: WaitNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
-  const [duration, setDuration] = useState(initialConfig?.duration || 5);
+  const [waitTime, setWaitTime] = useState(initialConfig?.waitTime || 5);
   const [unit, setUnit] = useState<"seconds" | "minutes">(initialConfig?.unit || "seconds");
 
   useEffect(() => {
     if (open) {
       setLabel(initialLabel);
-      setDuration(initialConfig?.duration || 5);
+      setWaitTime(initialConfig?.waitTime || 5);
       setUnit(initialConfig?.unit || "seconds");
     }
   }, [open, initialLabel, initialConfig]);
@@ -50,14 +50,14 @@ export function WaitNodeDialog({
     onSave({
       label: label.trim() || "Wait",
       config: {
-        duration: Math.max(1, duration),
+        waitTime: Math.max(1, waitTime),
         unit,
       },
     });
     onOpenChange(false);
   };
 
-  const maxDuration = unit === "minutes" ? 5 : 300;
+  const maxWaitTime = unit === "minutes" ? 5 : 300;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -81,14 +81,14 @@ export function WaitNodeDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="duration">Duration</Label>
+              <Label htmlFor="waitTime">Duration</Label>
               <Input
-                id="duration"
+                id="waitTime"
                 type="number"
                 min={1}
-                max={maxDuration}
-                value={duration}
-                onChange={(e) => setDuration(Math.min(maxDuration, parseInt(e.target.value) || 1))}
+                max={maxWaitTime}
+                value={waitTime}
+                onChange={(e) => setWaitTime(Math.min(maxWaitTime, parseInt(e.target.value) || 1))}
               />
             </div>
             <div>
