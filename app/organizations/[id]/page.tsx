@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { useOrganization, useOrganizationMembers } from "@/hooks/use-organizations";
-import { useWorkflows } from "@/hooks/use-workflows";
+import { useWorkflows, useDeleteWorkflow } from "@/hooks/use-workflows";
 import { useCredentials } from "@/hooks/use-credentials";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowLeft, Building2, Users, Settings, Loader2, Workflow, Plus, Key } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Building2, Users, Settings, Loader2, Workflow, Plus, Key, Trash2 } from "lucide-react";
 
 export default function OrganizationDetailPage() {
   const router = useRouter();
@@ -36,6 +44,9 @@ export default function OrganizationDetailPage() {
 
   const { data: credentials, isLoading: isLoadingCredentials } =
     useCredentials(id);
+
+  const deleteWorkflow = useDeleteWorkflow(id);
+  const [workflowToDelete, setWorkflowToDelete] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (orgError?.data?.code === "UNAUTHORIZED") {
@@ -127,11 +138,14 @@ export default function OrganizationDetailPage() {
             ) : (
               <div className="space-y-3">
                 {workflows.map((workflow) => (
-                  <Link
+                  <div
                     key={workflow.id}
-                    href={`/organizations/${id}/workflows/${workflow.id}`}
+                    className="flex items-center justify-between p-3 rounded-md border hover:bg-accent transition-colors"
                   >
-                    <div className="flex items-center justify-between p-3 rounded-md border hover:bg-accent transition-colors cursor-pointer">
+                    <Link
+                      href={`/organizations/${id}/workflows/${workflow.id}`}
+                      className="flex-1 cursor-pointer"
+                    >
                       <div>
                         <p className="font-medium">{workflow.name}</p>
                         {workflow.description && (
@@ -140,6 +154,8 @@ export default function OrganizationDetailPage() {
                           </p>
                         )}
                       </div>
+                    </Link>
+                    <div className="flex items-center gap-2">
                       <span
                         className={`text-xs px-2 py-1 rounded-full ${
                           workflow.isActive
@@ -149,8 +165,20 @@ export default function OrganizationDetailPage() {
                       >
                         {workflow.isActive ? "Active" : "Inactive"}
                       </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setWorkflowToDelete({ id: workflow.id, name: workflow.name });
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}
@@ -288,6 +316,45 @@ export default function OrganizationDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete Workflow Confirmation Dialog */}
+      <Dialog open={!!workflowToDelete} onOpenChange={(open) => !open && setWorkflowToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Workflow löschen</DialogTitle>
+            <DialogDescription>
+              Bist du sicher, dass du den Workflow &quot;{workflowToDelete?.name}&quot; löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setWorkflowToDelete(null)}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (workflowToDelete) {
+                  deleteWorkflow.mutate({ id: workflowToDelete.id, organizationId: id });
+                  setWorkflowToDelete(null);
+                }
+              }}
+              disabled={deleteWorkflow.isPending}
+            >
+              {deleteWorkflow.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Löschen...
+                </>
+              ) : (
+                "Löschen"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
