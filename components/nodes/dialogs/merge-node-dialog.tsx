@@ -21,9 +21,10 @@ interface MergeNodeDialogProps {
   initialConfig?: {
     mode?: "append" | "combine" | "mergeByKey";
     mergeKey?: string;
+    inputCount?: number;
   };
   initialLabel?: string;
-  onSave: (data: { label: string; config: { mode: "append" | "combine" | "mergeByKey"; mergeKey?: string } }) => void;
+  onSave: (data: { label: string; config: { mode: "append" | "combine" | "mergeByKey"; mergeKey?: string; inputCount?: number } }) => void;
 }
 
 export function MergeNodeDialog({
@@ -39,12 +40,14 @@ export function MergeNodeDialog({
     initialConfig?.mode || "append"
   );
   const [mergeKey, setMergeKey] = useState(initialConfig?.mergeKey || "");
+  const [inputCount, setInputCount] = useState(initialConfig?.inputCount || 2);
 
   useEffect(() => {
     if (open) {
       setLabel(initialLabel);
       setMode(initialConfig?.mode || "append");
       setMergeKey(initialConfig?.mergeKey || "");
+      setInputCount(initialConfig?.inputCount || 2);
     }
   }, [open, initialLabel, initialConfig]);
 
@@ -54,6 +57,7 @@ export function MergeNodeDialog({
       config: {
         mode,
         mergeKey: mode === "mergeByKey" ? mergeKey.trim() : undefined,
+        inputCount: inputCount,
       },
     });
     onOpenChange(false);
@@ -109,6 +113,21 @@ export function MergeNodeDialog({
               />
             </div>
           )}
+
+          <div>
+            <Label htmlFor="inputCount">Number of Inputs</Label>
+            <Input
+              id="inputCount"
+              type="number"
+              min={2}
+              max={10}
+              value={inputCount}
+              onChange={(e) => setInputCount(Math.max(2, Math.min(10, parseInt(e.target.value) || 2)))}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              How many inputs to merge (2-10)
+            </p>
+          </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>

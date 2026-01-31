@@ -18,6 +18,7 @@ interface MergeNodeData {
     mode?: "append" | "combine" | "chooseBranch" | "multiplex";
     combineMode?: "mergeByPosition" | "mergeByKey" | "allCombinations";
     joinField?: string;
+    inputCount?: number;
   };
   onEdit?: (nodeId: string) => void;
   onExecute?: (nodeId: string) => void;
@@ -32,6 +33,9 @@ interface MergeNodeData {
 
 export const MergeNode = memo(({ data, selected, id }: NodeProps<MergeNodeData>) => {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
+  
+  // Dynamic input count (default 2, min 2, max 10)
+  const inputCount = Math.max(2, Math.min(10, data.config?.inputCount || 2));
 
   const handleDoubleClick = () => {
     if (data.onEdit) {
@@ -99,21 +103,17 @@ export const MergeNode = memo(({ data, selected, id }: NodeProps<MergeNodeData>)
         onDoubleClick={handleDoubleClick}
         title="Double-click to configure"
       >
-      {/* Two input handles for merging */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="input1"
-        className="w-3 h-3 !bg-gray-500"
-        style={{ left: '30%' }}
-      />
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="input2"
-        className="w-3 h-3 !bg-gray-400"
-        style={{ left: '70%' }}
-      />
+      {/* Dynamic input handles based on inputCount */}
+      {Array.from({ length: inputCount }, (_, i) => (
+        <Handle
+          key={`input${i + 1}`}
+          type="target"
+          position={Position.Top}
+          id={`input${i + 1}`}
+          className="w-3 h-3 !bg-gray-500"
+          style={{ left: `${((i + 1) / (inputCount + 1)) * 100}%` }}
+        />
+      ))}
 
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
