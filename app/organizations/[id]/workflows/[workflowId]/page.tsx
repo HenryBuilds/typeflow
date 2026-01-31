@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search, Lock, Database } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search, Lock, Database, Square } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -1073,6 +1073,23 @@ export default function WorkflowEditorPage() {
                 <><Play className="h-4 w-4 mr-2" />Run</>
               )}
             </Button>
+            
+            {/* Cancel Button - shown when running */}
+            {runMutation.isPending && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  runMutation.reset();
+                  setExecutingNodeId(null);
+                  addLog({ level: "warning", message: "Execution cancelled by user" });
+                }}
+                className="ml-2"
+              >
+                <Square className="h-4 w-4 mr-2" />
+                Stop
+              </Button>
+            )}
             
             {/* Mode Selector Dropdown */}
             <DropdownMenu>
