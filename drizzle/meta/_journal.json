@@ -71,6 +71,13 @@
       "when": 1769769881002,
       "tag": "0009_confused_micromax",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1769874340536,
+      "tag": "0010_superb_silver_samurai",
+      "breakpoints": true
     }
   ]
 }

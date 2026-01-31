@@ -5,6 +5,7 @@ export * from "./organizations";
 export * from "./users";
 export * from "./organization-members";
 export * from "./workflows";
+export * from "./workflow-versions";
 export * from "./nodes";
 export * from "./connections";
 export * from "./packages";
@@ -32,6 +33,7 @@ import { packages } from "./packages";
 import { environments } from "./environments";
 import { credentials } from "./credentials";
 import { customNodes } from "./custom-nodes";
+import { workflowVersions } from "./workflow-versions";
 
 // Define all relations here to avoid circular dependencies
 export const organizationsRelations = relations(organizations, ({ many }) => ({
@@ -72,6 +74,7 @@ export const workflowsRelations = relations(workflows, ({ one, many }) => ({
   nodes: many(nodes),
   executions: many(executions),
   webhooks: many(webhooks),
+  versions: many(workflowVersions),
 }));
 
 export const nodesRelations = relations(nodes, ({ one, many }) => ({
@@ -210,10 +213,25 @@ export type NewCredential = InferInsertModel<typeof credentials>;
 export type CustomNode = InferSelectModel<typeof customNodes>;
 export type NewCustomNode = InferInsertModel<typeof customNodes>;
 
+export type WorkflowVersion = InferSelectModel<typeof workflowVersions>;
+export type NewWorkflowVersion = InferInsertModel<typeof workflowVersions>;
+
 // Custom nodes relations
 export const customNodesRelations = relations(customNodes, ({ one }) => ({
   organization: one(organizations, {
     fields: [customNodes.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+// Workflow versions relations
+export const workflowVersionsRelations = relations(workflowVersions, ({ one }) => ({
+  workflow: one(workflows, {
+    fields: [workflowVersions.workflowId],
+    references: [workflows.id],
+  }),
+  organization: one(organizations, {
+    fields: [workflowVersions.organizationId],
     references: [organizations.id],
   }),
 }));

@@ -45,6 +45,7 @@ import {
   ExternalNodeDialog,
   DatabaseNodeDialog,
 } from "@/components/nodes/dialogs";
+import { WorkflowVersionsPanel } from "@/components/workflow-versions-panel";
 import { useSaveWorkflow, useWorkflow, useUpdateWorkflow } from "@/hooks/use-workflows";
 import { usePackages } from "@/hooks/use-packages";
 import { useRunWorkflow, useRunWorkflowUntilNode } from "@/hooks/use-executions";
@@ -141,6 +142,7 @@ export default function WorkflowEditorPage() {
   const [editingDatabaseType, setEditingDatabaseType] = useState<"postgres" | "mysql" | "mongodb" | "redis">("postgres");
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [debugStateDialogOpen, setDebugStateDialogOpen] = useState(false);
+  const [versionsPanelOpen, setVersionsPanelOpen] = useState(false);
   const [workflowLogs, setWorkflowLogs] = useState<WorkflowLog[]>([]);
   const [logPanelCollapsed, setLogPanelCollapsed] = useState(false); // Start expanded by default so it's visible
   const [executionMode, setExecutionMode] = useState<"run" | "debug">("run"); // New state for execution mode
@@ -1129,6 +1131,14 @@ export default function WorkflowEditorPage() {
           >
             <Save className="h-4 w-4 mr-2" />
             {saveMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setVersionsPanelOpen(true)}
+            title="Version History"
+          >
+            <History className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -3401,6 +3411,17 @@ export default function WorkflowEditorPage() {
         onOpenChange={setWorkflowVariablesDialogOpen}
         organizationId={organizationId}
         workflowId={workflowId}
+      />
+      
+      <WorkflowVersionsPanel
+        workflowId={workflowId}
+        organizationId={organizationId}
+        isOpen={versionsPanelOpen}
+        onClose={() => setVersionsPanelOpen(false)}
+        onVersionRestored={() => {
+          // Refetch workflow data when a version is restored
+          window.location.reload();
+        }}
       />
     </div>
   );

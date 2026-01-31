@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { router, organizationProcedure } from "../trpc";
 import { db } from "@/db/db";
-import { workflows, nodes, connections, webhooks } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { workflows, nodes, connections, webhooks, workflowVersions } from "@/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 export const workflowsRouter = router({
   // List all workflows in organization
@@ -176,6 +176,73 @@ export const workflowsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       let workflowId = input.workflowId;
+
+      // For existing workflows, create a version snapshot BEFORE modifying
+      if (workflowId) {
+        // Get current workflow state for version snapshot
+        const existingWorkflow = await db.query.workflows.findFirst({
+          where: and(
+            eq(workflows.id, workflowId),
+            eq(workflows.organizationId, ctx.organization.id)
+          ),
+          with: { nodes: true },
+        });
+
+        if (existingWorkflow && existingWorkflow.nodes.length > 0) {
+          // Get current connections
+          const existingConnections = await db.query.connections.findMany({
+            where: eq(connections.workflowId, workflowId),
+          });
+
+          // Get next version number
+          const latestVersion = await db.query.workflowVersions.findFirst({
+            where: eq(workflowVersions.workflowId, workflowId),
+            orderBy: [desc(workflowVersions.versionNumber)],
+          });
+
+          const nextVersionNumber = latestVersion ? latestVersion.versionNumber + 1 : 1;
+
+          // Create version snapshot
+          await db.insert(workflowVersions).values({
+            workflowId,
+            organizationId: ctx.organization.id,
+            versionNumber: nextVersionNumber,
+            snapshot: {
+              name: existingWorkflow.name,
+              description: existingWorkflow.description,
+              metadata: existingWorkflow.metadata,
+              nodes: existingWorkflow.nodes.map(node => ({
+                originalId: node.id,
+                type: node.type,
+                label: node.label,
+                position: node.position as { x: number; y: number },
+                config: (node.config || {}) as Record<string, unknown>,
+                executionOrder: node.executionOrder,
+              })),
+              connections: existingConnections.map(conn => ({
+                sourceNodeId: conn.sourceNodeId,
+                targetNodeId: conn.targetNodeId,
+                sourceHandle: conn.sourceHandle || undefined,
+                targetHandle: conn.targetHandle || undefined,
+                dataMapping: (conn.dataMapping || undefined) as Record<string, string> | undefined,
+              })),
+            },
+          });
+
+          // Clean up old versions (keep last 50)
+          const allVersions = await db.query.workflowVersions.findMany({
+            where: eq(workflowVersions.workflowId, workflowId),
+            orderBy: [desc(workflowVersions.versionNumber)],
+          });
+
+          if (allVersions.length > 50) {
+            const versionsToDelete = allVersions.slice(50);
+            for (const v of versionsToDelete) {
+              await db.delete(workflowVersions).where(eq(workflowVersions.id, v.id));
+            }
+          }
+        }
+      }
 
       // Create or update workflow
       if (workflowId) {

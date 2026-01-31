@@ -1,6 +1,7 @@
 import { router } from "./trpc";
 import { organizationsRouter } from "./routers/organizations";
 import { workflowsRouter } from "./routers/workflows";
+import { workflowVersionsRouter } from "./routers/workflow-versions";
 import { packagesRouter } from "./routers/packages";
 import { executionsRouter } from "./routers/executions";
 import { environmentsRouter } from "./routers/environments";
@@ -15,6 +16,7 @@ export const appRouter = router({
   auth: authRouter,
   organizations: organizationsRouter,
   workflows: workflowsRouter,
+  workflowVersions: workflowVersionsRouter,
   packages: packagesRouter,
   executions: executionsRouter,
   environments: environmentsRouter,
