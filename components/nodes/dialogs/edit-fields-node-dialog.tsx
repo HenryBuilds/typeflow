@@ -16,6 +16,8 @@ import {
 import { ExpressionInput } from "@/components/ui/expression-input";
 import { InputDataItem } from "./types";
 
+import { NodeDialogLayout } from "./node-dialog-layout";
+
 interface Operation {
   operation: "set" | "rename" | "remove";
   field: string;
@@ -27,6 +29,7 @@ interface EditFieldsNodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeId: string;
+  organizationId: string;
   initialConfig?: {
     operations?: Operation[];
   };
@@ -40,6 +43,7 @@ export function EditFieldsNodeDialog({
   open,
   onOpenChange,
   nodeId,
+  organizationId,
   initialConfig,
   initialLabel = "Edit Fields",
   inputData = [],
@@ -85,13 +89,16 @@ export function EditFieldsNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Pencil className="h-5 w-5 text-gray-500" />
-            Configure Edit Fields
-          </DialogTitle>
-        </DialogHeader>
+      <NodeDialogLayout
+        title="Configure Edit Fields"
+        icon={<Pencil className="h-5 w-5 text-gray-500" />}
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+        className="max-h-[80vh] overflow-y-auto"
+      >
         <div className="space-y-4">
           <div>
             <Label htmlFor="label">Node Label</Label>
@@ -175,7 +182,7 @@ export function EditFieldsNodeDialog({
             </Button>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex justify-end gap-2 pt-4 border-t sticky bottom-0 bg-background/95 backdrop-blur py-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -184,7 +191,7 @@ export function EditFieldsNodeDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </NodeDialogLayout>
     </Dialog>
   );
 }

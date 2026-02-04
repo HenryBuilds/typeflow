@@ -11,6 +11,7 @@ export interface InputDataItem {
   sourceNodeId: string;
   output: unknown;
   sourceNodeLabel?: string;
+  distance?: number;
 }
 
 /**

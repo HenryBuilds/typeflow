@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { ExpressionInput } from "@/components/ui/expression-input";
 import { InputDataItem } from "./types";
+import { NodeDialogLayout } from "./node-dialog-layout";
 
 interface Condition {
   field: string;
@@ -33,6 +34,7 @@ interface IfNodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeId: string;
+  organizationId?: string; // Added prop
   initialConfig?: {
     // Legacy format (single branch)
     conditions?: Condition[];
@@ -51,6 +53,7 @@ export function IfNodeDialog({
   open,
   onOpenChange,
   nodeId,
+  organizationId,
   initialConfig,
   initialLabel = "IF",
   inputData = [],
@@ -202,13 +205,15 @@ export function IfNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <GitBranch className="h-5 w-5 text-gray-600" />
-            Configure IF Branch
-          </DialogTitle>
-        </DialogHeader>
+      <NodeDialogLayout
+        title="Configure IF Branch"
+        icon={<GitBranch className="h-5 w-5 text-gray-600" />}
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+      >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Items are routed to the first matching branch. If no branch matches, items go to <span className="text-gray-600 font-medium">else</span>.
@@ -377,7 +382,7 @@ export function IfNodeDialog({
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex justify-end gap-2 pt-4 border-t sticky bottom-0 bg-background/95 backdrop-blur py-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -386,7 +391,7 @@ export function IfNodeDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </NodeDialogLayout>
     </Dialog>
   );
 }

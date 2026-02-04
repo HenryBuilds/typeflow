@@ -3220,6 +3220,7 @@ export default function WorkflowEditorPage() {
             if (!open) setEditingEditFieldsNode(null);
           }}
           nodeId={editingEditFieldsNode.id}
+          organizationId={organizationId}
           initialConfig={editingEditFieldsNode.data?.config as any}
           initialLabel={editingEditFieldsNode.data?.label || "Edit Fields"}
           inputData={getNodeInputData(editingEditFieldsNode.id)}
@@ -3231,6 +3232,9 @@ export default function WorkflowEditorPage() {
                 ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
                 : node
             );
+            if (setNodesRef.current) {
+              setNodesRef.current(updatedNodes);
+            }
             const currentEdges = getEdgesRef.current?.() || [];
             saveMutation.mutate(
               {
@@ -3272,6 +3276,9 @@ export default function WorkflowEditorPage() {
                 ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
                 : node
             );
+            if (setNodesRef.current) {
+              setNodesRef.current(updatedNodes);
+            }
             const currentEdges = getEdgesRef.current?.() || [];
             saveMutation.mutate(
               {
@@ -3503,6 +3510,7 @@ export default function WorkflowEditorPage() {
             if (!open) setEditingIfNode(null);
           }}
           nodeId={editingIfNode.id}
+          organizationId={organizationId}
           initialConfig={editingIfNode.data?.config as any}
           initialLabel={editingIfNode.data?.label || "IF"}
           inputData={getNodeInputData(editingIfNode.id)}
@@ -3514,6 +3522,9 @@ export default function WorkflowEditorPage() {
                 ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
                 : node
             );
+            if (setNodesRef.current) {
+              setNodesRef.current(updatedNodes);
+            }
             const currentEdges = getEdgesRef.current?.() || [];
             saveMutation.mutate(
               {
@@ -3543,6 +3554,7 @@ export default function WorkflowEditorPage() {
             if (!open) setEditingSwitchNode(null);
           }}
           nodeId={editingSwitchNode.id}
+          organizationId={organizationId}
           initialConfig={editingSwitchNode.data?.config as any}
           initialLabel={editingSwitchNode.data?.label || "Switch"}
           inputData={getNodeInputData(editingSwitchNode.id)}
@@ -3554,6 +3566,9 @@ export default function WorkflowEditorPage() {
                 ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
                 : node
             );
+            if (setNodesRef.current) {
+              setNodesRef.current(updatedNodes);
+            }
             const currentEdges = getEdgesRef.current?.() || [];
             saveMutation.mutate(
               {

@@ -30,10 +30,13 @@ interface SwitchCase {
   combineWith: "and" | "or";
 }
 
+import { NodeDialogLayout } from "./node-dialog-layout";
+
 interface SwitchNodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeId: string;
+  organizationId: string;
   initialConfig?: {
     mode?: "rules" | "expression";
     cases?: SwitchCase[];
@@ -60,6 +63,7 @@ export function SwitchNodeDialog({
   open,
   onOpenChange,
   nodeId,
+  organizationId,
   initialConfig,
   initialLabel = "Switch",
   inputData = [],
@@ -185,13 +189,16 @@ export function SwitchNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Network className="h-5 w-5 text-purple-600" />
-            Configure Switch
-          </DialogTitle>
-        </DialogHeader>
+      <NodeDialogLayout
+        title="Configure Switch"
+        icon={<Network className="h-5 w-5 text-purple-600" />}
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+        className="max-h-[85vh] overflow-y-auto"
+      >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Route data to different outputs based on matching rules. Cases are evaluated in order - the first match wins.
@@ -343,7 +350,7 @@ export function SwitchNodeDialog({
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex justify-end gap-2 pt-4 border-t sticky bottom-0 bg-background/95 backdrop-blur py-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
@@ -352,7 +359,7 @@ export function SwitchNodeDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </NodeDialogLayout>
     </Dialog>
   );
 }
