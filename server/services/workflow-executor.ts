@@ -19,7 +19,10 @@ import {
   executeMergeNode,
   executeSummarizeNode,
   executeDateTimeNode,
-  executeEditFieldsNode
+  executeEditFieldsNode,
+  executeIfNode,
+  executeSwitchNode,
+  ConditionalExecutionResult
 } from "./data-transform-executor";
 import { 
   executePostgresNode, 
@@ -489,23 +492,25 @@ export class WorkflowExecutor {
           );
 
           if (inputConnections.length > 0) {
-            // Single connection passes items directly
-            if (inputConnections.length === 1) {
-              const sourceOutput = nodeOutputs.get(
-                inputConnections[0].sourceNodeId
-              );
-              inputItems = sourceOutput || [{ json: {} }];
-            } else {
-              // Multiple inputs - merge items from multiple sources
-              const allItems: ExecutionItem[] = [];
-              for (const conn of inputConnections) {
+            // Collect items from all input connections
+            const allItems: ExecutionItem[] = [];
+            for (const conn of inputConnections) {
+              // First check for connection-specific output (from IF/Switch nodes)
+              const connectionSpecificKey = `${conn.sourceNodeId}:${currentNodeId}`;
+              const connectionSpecificOutput = nodeOutputs.get(connectionSpecificKey);
+              
+              if (connectionSpecificOutput) {
+                // Use the routed output from conditional node
+                allItems.push(...connectionSpecificOutput);
+              } else {
+                // Fall back to regular node output
                 const sourceOutput = nodeOutputs.get(conn.sourceNodeId);
                 if (sourceOutput) {
                   allItems.push(...sourceOutput);
                 }
               }
-              inputItems = allItems.length > 0 ? allItems : [{ json: {} }];
             }
+            inputItems = allItems.length > 0 ? allItems : [{ json: {} }];
           } else {
             // No input connections - start with empty item
             inputItems = [{ json: {} }];
@@ -663,6 +668,92 @@ export class WorkflowExecutor {
               creds as Record<string, unknown>
             );
           }
+          
+        } else if (currentNode.type === "if") {
+          // IF node - conditional routing to true/false outputs
+          const conditionalResult = executeIfNode(currentNode, inputItems);
+          
+          // Store conditional outputs for routing
+          const trueItems = conditionalResult.outputs["true"] || [];
+          const falseItems = conditionalResult.outputs["false"] || [];
+          
+          // For IF nodes, store combined output for display, but route items separately
+          outputItems = [...trueItems, ...falseItems];
+          
+          // Route items to connected nodes based on source handle
+          const nextConnections = workflowConnections.filter(
+            (c) => c.sourceNodeId === currentNodeId
+          );
+          
+          for (const conn of nextConnections) {
+            const sourceHandle = conn.sourceHandle || "true"; // Default to true
+            const relevantItems = sourceHandle === "true" ? trueItems : falseItems;
+            
+            // Only add to queue if there are items to pass and not already executed
+            if (relevantItems.length > 0 && !executedNodes.has(conn.targetNodeId)) {
+              // Store the items this specific connection should receive
+              const existingOutput = nodeOutputs.get(`${currentNodeId}:${conn.targetNodeId}`);
+              if (existingOutput) {
+                nodeOutputs.set(`${currentNodeId}:${conn.targetNodeId}`, [...existingOutput, ...relevantItems]);
+              } else {
+                nodeOutputs.set(`${currentNodeId}:${conn.targetNodeId}`, relevantItems);
+              }
+              executionQueue.push(conn.targetNodeId);
+            }
+          }
+          
+          // Skip normal queue addition - we've handled it above
+          const duration = Date.now() - startTime;
+          nodeOutputs.set(currentNodeId, outputItems);
+          nodeResults[currentNodeId] = {
+            nodeId: currentNodeId,
+            nodeLabel: currentNode?.label,
+            status: "completed",
+            output: outputItems,
+            duration,
+          };
+          continue;
+          
+        } else if (currentNode.type === "switch") {
+          // Switch node - conditional routing to multiple case outputs
+          const conditionalResult = executeSwitchNode(currentNode, inputItems);
+          
+          // Combine all outputs for display
+          outputItems = Object.values(conditionalResult.outputs).flat();
+          
+          // Route items to connected nodes based on source handle (case ID)
+          const nextConnections = workflowConnections.filter(
+            (c) => c.sourceNodeId === currentNodeId
+          );
+          
+          for (const conn of nextConnections) {
+            const sourceHandle = conn.sourceHandle || "fallback";
+            const relevantItems = conditionalResult.outputs[sourceHandle] || [];
+            
+            // Only add to queue if there are items to pass and not already executed
+            if (relevantItems.length > 0 && !executedNodes.has(conn.targetNodeId)) {
+              // Store the items this specific connection should receive
+              const existingOutput = nodeOutputs.get(`${currentNodeId}:${conn.targetNodeId}`);
+              if (existingOutput) {
+                nodeOutputs.set(`${currentNodeId}:${conn.targetNodeId}`, [...existingOutput, ...relevantItems]);
+              } else {
+                nodeOutputs.set(`${currentNodeId}:${conn.targetNodeId}`, relevantItems);
+              }
+              executionQueue.push(conn.targetNodeId);
+            }
+          }
+          
+          // Skip normal queue addition - we've handled it above
+          const duration = Date.now() - startTime;
+          nodeOutputs.set(currentNodeId, outputItems);
+          nodeResults[currentNodeId] = {
+            nodeId: currentNodeId,
+            nodeLabel: currentNode?.label,
+            status: "completed",
+            output: outputItems,
+            duration,
+          };
+          continue;
           
         } else {
           // Generic node - just pass through

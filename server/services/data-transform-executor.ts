@@ -505,3 +505,177 @@ export function executeEditFieldsNode(
     return { json: newJson };
   });
 }
+
+// Conditional execution result type - indicates which output handle to route data to
+export interface ConditionalExecutionResult {
+  // Map of outputHandle -> items to route to that handle
+  outputs: Record<string, ExecutionItem[]>;
+}
+
+// IF Node Execution - routes items to matching branch outputs or else
+export function executeIfNode(
+  node: typeof nodes.$inferSelect,
+  inputItems: ExecutionItem[]
+): ConditionalExecutionResult {
+  const config = node.config as {
+    // Legacy format
+    conditions?: Array<{ field: string; operator: string; value: string }>;
+    combineWith?: "and" | "or";
+    // New format
+    branches?: Array<{
+      id: string;
+      name: string;
+      conditions: Array<{ field: string; operator: string; value: string }>;
+      combineWith?: "and" | "or";
+    }>;
+    elseEnabled?: boolean;
+  };
+
+  // Handle legacy format (simple true/false)
+  if (!config?.branches || config.branches.length === 0) {
+    if (!config?.conditions || config.conditions.length === 0) {
+      // No conditions - all items go to true
+      return {
+        outputs: {
+          "true": inputItems,
+          "false": [],
+        },
+      };
+    }
+
+    const combineWith = config.combineWith || "and";
+    const trueItems: ExecutionItem[] = [];
+    const falseItems: ExecutionItem[] = [];
+
+    for (const item of inputItems) {
+      const results = config.conditions.map(condition => {
+        const fieldValue = getNestedValue(item.json, condition.field);
+        return evaluateCondition(fieldValue, condition.operator, condition.value);
+      });
+
+      const matches = combineWith === "and" 
+        ? results.every(r => r) 
+        : results.some(r => r);
+
+      if (matches) {
+        trueItems.push(item);
+      } else {
+        falseItems.push(item);
+      }
+    }
+
+    return {
+      outputs: {
+        "true": trueItems,
+        "false": falseItems,
+      },
+    };
+  }
+
+  // New format with branches (if/else if/else)
+  const branches = config.branches;
+  const elseEnabled = config.elseEnabled !== false;
+
+  // Initialize outputs for each branch
+  const outputs: Record<string, ExecutionItem[]> = {};
+  for (const branch of branches) {
+    outputs[branch.id] = [];
+  }
+  if (elseEnabled) {
+    outputs["else"] = [];
+  }
+
+  // Route each item to the first matching branch
+  for (const item of inputItems) {
+    let matched = false;
+
+    for (const branch of branches) {
+      if (branch.conditions.length === 0) continue;
+
+      const combineWith = branch.combineWith || "and";
+      const results = branch.conditions.map(condition => {
+        const fieldValue = getNestedValue(item.json, condition.field);
+        return evaluateCondition(fieldValue, condition.operator, condition.value);
+      });
+
+      const branchMatches = combineWith === "and" 
+        ? results.every(r => r) 
+        : results.some(r => r);
+
+      if (branchMatches) {
+        outputs[branch.id].push(item);
+        matched = true;
+        break; // Stop at first matching branch (like if/else if logic)
+      }
+    }
+
+    // If no branch matched, go to else
+    if (!matched && elseEnabled) {
+      outputs["else"].push(item);
+    }
+  }
+
+  return { outputs };
+}
+
+// Switch Node Execution - routes items to matching case outputs or fallback
+export function executeSwitchNode(
+  node: typeof nodes.$inferSelect,
+  inputItems: ExecutionItem[]
+): ConditionalExecutionResult {
+  const config = node.config as {
+    mode?: "rules" | "expression";
+    cases?: Array<{
+      id: string;
+      name: string;
+      conditions: Array<{ field: string; operator: string; value: string }>;
+      combineWith: "and" | "or";
+    }>;
+    fallbackEnabled?: boolean;
+  };
+
+  const cases = config?.cases || [];
+  const fallbackEnabled = config?.fallbackEnabled !== false;
+
+  // Initialize outputs for each case
+  const outputs: Record<string, ExecutionItem[]> = {};
+  for (const caseItem of cases) {
+    outputs[caseItem.id] = [];
+  }
+  if (fallbackEnabled) {
+    outputs["fallback"] = [];
+  }
+
+  // Route each item to the first matching case
+  for (const item of inputItems) {
+    let matched = false;
+
+    for (const caseItem of cases) {
+      if (caseItem.conditions.length === 0) {
+        continue;
+      }
+
+      const results = caseItem.conditions.map(condition => {
+        const fieldValue = getNestedValue(item.json, condition.field);
+        return evaluateCondition(fieldValue, condition.operator, condition.value);
+      });
+
+      const matches = caseItem.combineWith === "and" 
+        ? results.every(r => r) 
+        : results.some(r => r);
+
+      if (matches) {
+        outputs[caseItem.id].push(item);
+        matched = true;
+        break; // First match wins
+      }
+    }
+
+    // If no case matched and fallback is enabled, route to fallback
+    if (!matched && fallbackEnabled) {
+      outputs["fallback"].push(item);
+    }
+  }
+
+  return { outputs };
+}

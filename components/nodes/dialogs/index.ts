@@ -11,4 +11,7 @@ export { EditFieldsNodeDialog } from "./edit-fields-node-dialog";
 export { HttpRequestNodeDialog } from "./http-request-node-dialog";
 export { ExternalNodeDialog } from "./external-node-dialog";
 export { DatabaseNodeDialog } from "../../database-node-dialog";
+export { IfNodeDialog } from "./if-node-dialog";
+export { SwitchNodeDialog } from "./switch-node-dialog";
 export type { InputDataItem, ExpressionDialogProps } from "./types";
+

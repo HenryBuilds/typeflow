@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search, Lock, Database, Square } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search, Lock, Database, Square, GitFork, LayoutList } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -44,6 +44,8 @@ import {
   HttpRequestNodeDialog,
   ExternalNodeDialog,
   DatabaseNodeDialog,
+  IfNodeDialog,
+  SwitchNodeDialog,
 } from "@/components/nodes/dialogs";
 import { WorkflowVersionsPanel } from "@/components/workflow-versions-panel";
 import { useSaveWorkflow, useWorkflow, useUpdateWorkflow } from "@/hooks/use-workflows";
@@ -140,6 +142,11 @@ export default function WorkflowEditorPage() {
   const [databaseDialogOpen, setDatabaseDialogOpen] = useState(false);
   const [editingDatabaseNode, setEditingDatabaseNode] = useState<Node | null>(null);
   const [editingDatabaseType, setEditingDatabaseType] = useState<"postgres" | "mysql" | "mongodb" | "redis">("postgres");
+  // Conditional node dialogs
+  const [ifDialogOpen, setIfDialogOpen] = useState(false);
+  const [editingIfNode, setEditingIfNode] = useState<Node | null>(null);
+  const [switchDialogOpen, setSwitchDialogOpen] = useState(false);
+  const [editingSwitchNode, setEditingSwitchNode] = useState<Node | null>(null);
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [debugStateDialogOpen, setDebugStateDialogOpen] = useState(false);
   const [versionsPanelOpen, setVersionsPanelOpen] = useState(false);
@@ -1684,6 +1691,62 @@ export default function WorkflowEditorPage() {
               </div>
               )}
 
+              {/* Flow Control Section */}
+              {(!nodeSearch || ["if", "switch", "condition", "branch"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
+              <div className="mb-4">
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, flowControl: !prev.flowControl }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Flow Control</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.flowControl ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.flowControl && (
+                <div className="space-y-1.5">
+                  {matchesSearch("if") && (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "if");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <GitFork className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">IF</span>
+                        <p className="text-xs text-muted-foreground truncate">Conditional branch</p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                  {matchesSearch("switch") && (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "switch");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <LayoutList className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Switch</span>
+                        <p className="text-xs text-muted-foreground truncate">Multi-way branch</p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                </div>
+                )}
+              </div>
+              )}
+
               {/* Combine Items Section */}
               {(!nodeSearch || ["aggregate", "merge", "summarize"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
               <div className="mb-4">
@@ -2136,6 +2199,14 @@ export default function WorkflowEditorPage() {
                   setEditingDatabaseNode(node);
                   setEditingDatabaseType(dbType);
                   setDatabaseDialogOpen(true);
+                }}
+                onIfEdit={(nodeId, node) => {
+                  setEditingIfNode(node);
+                  setIfDialogOpen(true);
+                }}
+                onSwitchEdit={(nodeId, node) => {
+                  setEditingSwitchNode(node);
+                  setSwitchDialogOpen(true);
                 }}
               />
             </div>
@@ -3422,6 +3493,87 @@ export default function WorkflowEditorPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* IF Node Dialog */}
+      {editingIfNode && (
+        <IfNodeDialog
+          open={ifDialogOpen}
+          onOpenChange={(open) => {
+            setIfDialogOpen(open);
+            if (!open) setEditingIfNode(null);
+          }}
+          nodeId={editingIfNode.id}
+          initialConfig={editingIfNode.data?.config as any}
+          initialLabel={editingIfNode.data?.label || "IF"}
+          inputData={getNodeInputData(editingIfNode.id)}
+          sourceNodeLabels={sourceNodeLabels}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingIfNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  setIfDialogOpen(false);
+                  setEditingIfNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Switch Node Dialog */}
+      {editingSwitchNode && (
+        <SwitchNodeDialog
+          open={switchDialogOpen}
+          onOpenChange={(open) => {
+            setSwitchDialogOpen(open);
+            if (!open) setEditingSwitchNode(null);
+          }}
+          nodeId={editingSwitchNode.id}
+          initialConfig={editingSwitchNode.data?.config as any}
+          initialLabel={editingSwitchNode.data?.label || "Switch"}
+          inputData={getNodeInputData(editingSwitchNode.id)}
+          sourceNodeLabels={sourceNodeLabels}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingSwitchNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  setSwitchDialogOpen(false);
+                  setEditingSwitchNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
       <CredentialDialog
         open={credentialsDialogOpen}
         onOpenChange={(open) => {

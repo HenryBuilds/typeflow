@@ -47,6 +47,8 @@ import { PostgresNode } from "./nodes/postgres-node";
 import { MySQLNode } from "./nodes/mysql-node";
 import { MongoDBNode } from "./nodes/mongodb-node";
 import { RedisNode } from "./nodes/redis-node";
+import { IfNode } from "./nodes/if-node";
+import { SwitchNode } from "./nodes/switch-node";
 import { CodeEditorDialog } from "./code-editor-dialog";
 import { DeletableEdge } from "./deletable-edge";
 import { Workflow, WorkflowNode as WorkflowNodeType, WorkflowConnection } from "@/types/domain";
@@ -82,6 +84,8 @@ const nodeTypes: NodeTypes = {
   mysql: MySQLNode,
   mongodb: MongoDBNode,
   redis: RedisNode,
+  if: IfNode,
+  switch: SwitchNode,
 };
 
 const edgeTypes = {
@@ -137,6 +141,9 @@ interface WorkflowEditorProps {
   onChatTriggerEdit?: (nodeId: string, node: Node) => void;
   onExternalNodeEdit?: (nodeId: string, node: Node) => void;
   onDatabaseNodeEdit?: (nodeId: string, node: Node, dbType: "postgres" | "mysql" | "mongodb" | "redis") => void;
+  // Callbacks for conditional nodes
+  onIfEdit?: (nodeId: string, node: Node) => void;
+  onSwitchEdit?: (nodeId: string, node: Node) => void;
   // External nodes from node loader
   externalNodes?: Array<{
     name: string;
@@ -198,6 +205,8 @@ export function WorkflowEditor({
   onChatTriggerEdit,
   onExternalNodeEdit,
   onDatabaseNodeEdit,
+  onIfEdit,
+  onSwitchEdit,
   externalNodes = [],
   // Debug mode props
   debugMode = false,
@@ -959,6 +968,51 @@ export function WorkflowEditor({
           },
         };
       }
+      // Conditional nodes
+      if (node.type === "if") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onIfEdit) {
+                onIfEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
+          },
+        };
+      }
+      if (node.type === "switch") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onSwitchEdit) {
+                onSwitchEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
+          },
+        };
+      }
       return {
         ...node,
         data: {
@@ -976,7 +1030,7 @@ export function WorkflowEditor({
         },
       };
     });
-  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit, onExternalNodeEdit, onDatabaseNodeEdit, debugMode, breakpoints, debugCurrentNodeId, onToggleBreakpoint]);
+  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit, onExternalNodeEdit, onDatabaseNodeEdit, onIfEdit, onSwitchEdit, debugMode, breakpoints, debugCurrentNodeId, onToggleBreakpoint]);
 
   const handleCodeSave = useCallback(
     (data: { code: string; label: string }) => {
@@ -1143,6 +1197,8 @@ export function WorkflowEditor({
         mysql: "MySQL",
         mongodb: "MongoDB",
         redis: "Redis",
+        if: "IF",
+        switch: "Switch",
       };
       const baseLabel = labelMap[type] || "Node";
       const uniqueLabel = generateUniqueLabel(baseLabel, nodes);
