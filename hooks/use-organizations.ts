@@ -46,3 +46,36 @@ export function useCheckSlugAvailability(slug: string) {
     }
   );
 }
+
+export function useCreateInviteLink(organizationId: string) {
+  const utils = trpc.useUtils();
+  return trpc.organizations.createInviteLink.useMutation({
+    onSuccess: () => {
+      utils.organizations.getInviteLinks.invalidate({ organizationId });
+    },
+  });
+}
+
+export function useRemoveMember(organizationId: string) {
+  const utils = trpc.useUtils();
+  return trpc.organizations.removeMember.useMutation({
+    onSuccess: () => {
+      utils.organizations.getMembers.invalidate({ organizationId });
+    },
+  });
+}
+
+export function useInviteInfo(code: string) {
+  return trpc.organizations.getInviteInfo.useQuery(
+    { code },
+    {
+      enabled: !!code,
+      retry: false,
+    }
+  );
+}
+
+export function useAcceptInvite() {
+  return trpc.organizations.acceptInvite.useMutation();
+}
+

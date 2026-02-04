@@ -78,6 +78,13 @@
       "when": 1769874340536,
       "tag": "0010_superb_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1770237523660,
+      "tag": "0011_yellow_doctor_octopus",
+      "breakpoints": true
     }
   ]
 }

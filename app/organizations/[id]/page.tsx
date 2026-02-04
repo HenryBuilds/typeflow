@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { useOrganization, useOrganizationMembers } from "@/hooks/use-organizations";
+import { useOrganization, useOrganizationMembers, useCreateInviteLink, useRemoveMember } from "@/hooks/use-organizations";
 import { useWorkflows, useDeleteWorkflow } from "@/hooks/use-workflows";
 import { useCredentials } from "@/hooks/use-credentials";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Building2, Users, Settings, Loader2, Workflow, Plus, Key, Trash2 } from "lucide-react";
+import { ArrowLeft, Building2, Users, Settings, Loader2, Workflow, Plus, Key, Trash2, Copy, Check, Link2, UserPlus } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 export default function OrganizationDetailPage() {
   const router = useRouter();
@@ -185,52 +186,7 @@ export default function OrganizationDetailPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Members
-            </CardTitle>
-            <CardDescription>
-              {isLoadingMembers ? (
-                "Loading..."
-              ) : (
-                <>
-                  {members?.length || 0} member
-                  {(members?.length || 0) !== 1 ? "s" : ""}
-                </>
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingMembers ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : !members || members.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No members yet</p>
-            ) : (
-              <div className="space-y-3">
-                {members.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex items-center justify-between p-3 rounded-md border"
-                  >
-                    <div>
-                      <p className="font-medium">{member.user.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {member.user.email}
-                      </p>
-                    </div>
-                    <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
-                      {member.role}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <MembersCard organizationId={id} members={members} isLoading={isLoadingMembers} />
 
         <Card>
           <CardHeader>
@@ -358,3 +314,200 @@ export default function OrganizationDetailPage() {
     </div>
   );
 }
+
+// Separate MembersCard component for invite link functionality
+
+interface MembersCardProps {
+  organizationId: string;
+  members: Array<{
+    id: string;
+    role: string;
+    user: { name: string | null; email: string };
+  }> | undefined;
+  isLoading: boolean;
+}
+
+function MembersCard({ organizationId, members, isLoading }: MembersCardProps) {
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
+
+  const createInvite = useCreateInviteLink(organizationId);
+  const removeMemberMutation = useRemoveMember(organizationId);
+
+  const handleCreateInvite = () => {
+    setShowInviteDialog(true);
+    createInvite.mutate({ organizationId, role: "member" }, {
+      onSuccess: (invite) => {
+        const link = `${window.location.origin}/invite/${invite.code}`;
+        setInviteLink(link);
+      },
+    });
+  };
+
+  const handleCopy = async () => {
+    if (inviteLink) {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleRemoveMember = (memberId: string, memberName: string) => {
+    setMemberToRemove({ id: memberId, name: memberName });
+  };
+
+  const confirmRemoveMember = () => {
+    if (memberToRemove) {
+      removeMemberMutation.mutate({ organizationId, memberId: memberToRemove.id }, {
+        onSuccess: () => setMemberToRemove(null),
+      });
+    }
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Members
+              </CardTitle>
+              <CardDescription>
+                {isLoading ? (
+                  "Loading..."
+                ) : (
+                  <>
+                    {members?.length || 0} member
+                    {(members?.length || 0) !== 1 ? "s" : ""}
+                  </>
+                )}
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleCreateInvite}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Invite
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : !members || members.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No members yet</p>
+          ) : (
+            <div className="space-y-3">
+              {members.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between p-3 rounded-md border"
+                >
+                  <div>
+                    <p className="font-medium">{member.user.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {member.user.email}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground capitalize">
+                      {member.role}
+                    </span>
+                    {member.role !== "owner" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRemoveMember(member.id, member.user.name || member.user.email)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Invite Link Dialog */}
+      <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5" />
+              Invite Link
+            </DialogTitle>
+            <DialogDescription>
+              Share this link to invite new members to your organization.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {createInvite.isPending ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : inviteLink ? (
+              <div className="flex gap-2">
+                <Input value={inviteLink} readOnly className="font-mono text-sm" />
+                <Button variant="outline" size="icon" onClick={handleCopy}>
+                  {copied ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              Anyone with this link can join as a member.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInviteDialog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Member Confirmation Dialog */}
+      <Dialog open={!!memberToRemove} onOpenChange={(open) => !open && setMemberToRemove(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Member</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove &quot;{memberToRemove?.name}&quot; from the organization?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMemberToRemove(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRemoveMember}
+              disabled={removeMemberMutation.isPending}
+            >
+              {removeMemberMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Remove"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+

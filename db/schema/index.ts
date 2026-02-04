@@ -4,6 +4,7 @@ import { relations, type InferSelectModel, type InferInsertModel } from "drizzle
 export * from "./organizations";
 export * from "./users";
 export * from "./organization-members";
+export * from "./organization-invites";
 export * from "./workflows";
 export * from "./workflow-versions";
 export * from "./nodes";
@@ -22,6 +23,7 @@ export * from "./custom-nodes";
 import { organizations } from "./organizations";
 import { users } from "./users";
 import { organizationMembers } from "./organization-members";
+import { organizationInvites } from "./organization-invites";
 import { workflows } from "./workflows";
 import { nodes } from "./nodes";
 import { connections } from "./connections";
@@ -38,6 +40,7 @@ import { workflowVersions } from "./workflow-versions";
 // Define all relations here to avoid circular dependencies
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   members: many(organizationMembers),
+  invites: many(organizationInvites),
   workflows: many(workflows),
   packages: many(packages),
   environments: many(environments),
@@ -235,3 +238,19 @@ export const workflowVersionsRelations = relations(workflowVersions, ({ one }) =
     references: [organizations.id],
   }),
 }));
+
+// Organization invites relations
+export const organizationInvitesRelations = relations(organizationInvites, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [organizationInvites.organizationId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [organizationInvites.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export type OrganizationInvite = InferSelectModel<typeof organizationInvites>;
+export type NewOrganizationInvite = InferInsertModel<typeof organizationInvites>;
+
