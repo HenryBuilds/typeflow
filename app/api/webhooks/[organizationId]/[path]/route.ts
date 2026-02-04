@@ -10,6 +10,101 @@ const log = createLogger('WebhookHandler');
 
 const ENABLE_QUEUE = process.env.ENABLE_WORKER_QUEUE === "true";
 
+/**
+ * Validate webhook authentication based on configured auth type
+ * Returns null if authentication passes, error message string if it fails
+ */
+function validateWebhookAuth(
+  request: NextRequest,
+  authType: string | null,
+  authConfig: Record<string, unknown> | null
+): string | null {
+  // No authentication required
+  if (!authType || authType === "none") {
+    return null;
+  }
+
+  const authHeader = request.headers.get("authorization") || "";
+
+  switch (authType) {
+    case "api_key": {
+      // API Key can be in header or query parameter
+      const configuredKey = authConfig?.apiKey as string;
+      const headerName = (authConfig?.headerName as string) || "x-api-key";
+      
+      if (!configuredKey) {
+        return null; // No key configured, allow request
+      }
+
+      // Check header
+      const headerKey = request.headers.get(headerName);
+      if (headerKey === configuredKey) {
+        return null;
+      }
+
+      // Check query parameter
+      const url = new URL(request.url);
+      const queryKey = url.searchParams.get("api_key") || url.searchParams.get("apiKey");
+      if (queryKey === configuredKey) {
+        return null;
+      }
+
+      return "Invalid or missing API key";
+    }
+
+    case "bearer": {
+      const configuredToken = authConfig?.token as string;
+      
+      if (!configuredToken) {
+        return null; // No token configured, allow request
+      }
+
+      if (!authHeader.toLowerCase().startsWith("bearer ")) {
+        return "Missing Bearer token";
+      }
+
+      const providedToken = authHeader.slice(7); // Remove "Bearer " prefix
+      if (providedToken !== configuredToken) {
+        return "Invalid Bearer token";
+      }
+
+      return null;
+    }
+
+    case "basic": {
+      const configuredUsername = authConfig?.username as string;
+      const configuredPassword = authConfig?.password as string;
+      
+      if (!configuredUsername || !configuredPassword) {
+        return null; // No credentials configured, allow request
+      }
+
+      if (!authHeader.toLowerCase().startsWith("basic ")) {
+        return "Missing Basic authentication";
+      }
+
+      try {
+        const base64Credentials = authHeader.slice(6); // Remove "Basic " prefix
+        const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
+        const [username, password] = credentials.split(":");
+
+        if (username !== configuredUsername || password !== configuredPassword) {
+          return "Invalid username or password";
+        }
+
+        return null;
+      } catch {
+        return "Invalid Basic authentication format";
+      }
+    }
+
+    default:
+      // Unknown auth type, allow request (fail-open for unknown types)
+      log.warn({ authType }, 'Unknown webhook auth type');
+      return null;
+  }
+}
+
 export const dynamic = "force-dynamic";
 
 export async function GET(
@@ -91,6 +186,8 @@ async function handleWebhookRequest(
       );
     }
 
+
+
     // Check if the associated workflow is active
     if (!webhook.workflow?.isActive) {
       log.warn({ organizationId, path, workflowId: webhook.workflowId }, 'Workflow inactive for webhook');
@@ -100,7 +197,15 @@ async function handleWebhookRequest(
       );
     }
 
-
+    // Validate webhook authentication (if configured)
+    const authError = validateWebhookAuth(request, webhook.authType, webhook.authConfig);
+    if (authError) {
+      log.warn({ organizationId, path, authType: webhook.authType }, 'Webhook authentication failed');
+      return NextResponse.json(
+        { error: authError },
+        { status: 401 }
+      );
+    }
 
     // Check if method matches (if specified in webhook config)
     if (webhook.method && webhook.method !== method) {
