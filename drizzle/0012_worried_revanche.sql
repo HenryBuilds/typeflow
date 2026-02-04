@@ -1,0 +1,1 @@
+ALTER TABLE "webhooks" ADD COLUMN "rate_limit" integer DEFAULT 100 NOT NULL;

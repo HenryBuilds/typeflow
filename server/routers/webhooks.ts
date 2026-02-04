@@ -67,6 +67,7 @@ export const webhooksRouter = router({
         authType: z.enum(["none", "api_key", "bearer", "basic"]).optional(),
         authConfig: z.record(z.string(), z.unknown()).optional(),
         requestSchema: z.record(z.string(), z.unknown()).optional(),
+        rateLimit: z.number().int().min(0).max(10000).default(100),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -94,6 +95,7 @@ export const webhooksRouter = router({
             authType: input.authType,
             authConfig: input.authConfig,
             requestSchema: input.requestSchema,
+            rateLimit: input.rateLimit,
             isActive: workflow.isActive, // Inherit from workflow
           })
           .returning();
@@ -126,6 +128,7 @@ export const webhooksRouter = router({
         authType: z.enum(["none", "api_key", "bearer", "basic"]).optional(),
         authConfig: z.record(z.string(), z.unknown()).optional(),
         requestSchema: z.record(z.string(), z.unknown()).optional(),
+        rateLimit: z.number().int().min(0).max(10000).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

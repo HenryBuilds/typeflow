@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { WorkflowExecutor } from "@/server/services/workflow-executor";
 import { addWorkflowJob } from "@/lib/queue/workflow-queue";
 import { createLogger } from "@/lib/logger";
+import { webhookRateLimiter, getRateLimitHeaders } from "@/lib/rate-limiter";
 
 const log = createLogger('WebhookHandler');
 
@@ -156,8 +157,6 @@ async function handleWebhookRequest(
     const { organizationId, path } = params;
     log.info({ organizationId, path, method }, 'Incoming webhook request');
 
-    
-
     // Find webhook by organization and path (first without isActive check to provide better error messages)
     const webhook = await db.query.webhooks.findFirst({
       where: and(
@@ -175,6 +174,31 @@ async function handleWebhookRequest(
         { error: "Webhook not found" },
         { status: 404 }
       );
+    }
+
+    // Rate limiting check using webhook's configured limit
+    const webhookLimit = webhook.rateLimit ?? 100; // Default to 100 if not set
+    if (webhookLimit > 0) {
+      const rateLimitKey = `${organizationId}:${path}`;
+      const rateLimitResult = await webhookRateLimiter.checkWithLimit(rateLimitKey, webhookLimit);
+      
+      if (!rateLimitResult.allowed) {
+        log.warn({ organizationId, path, method, limit: webhookLimit }, 'Rate limit exceeded for webhook');
+        return new NextResponse(
+          JSON.stringify({ 
+            error: "Rate limit exceeded",
+            message: "Too many requests. Please try again later.",
+            retryAfter: rateLimitResult.resetTime - Math.floor(Date.now() / 1000),
+          }),
+          { 
+            status: 429,
+            headers: {
+              "Content-Type": "application/json",
+              ...getRateLimitHeaders(rateLimitResult),
+            },
+          }
+        );
+      }
     }
 
     // Check if webhook is active

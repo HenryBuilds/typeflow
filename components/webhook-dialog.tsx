@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Webhook, Copy, ExternalLink, Radio, Send, AlertCircle, CheckCircle2, Shield, Eye, EyeOff, Key } from "lucide-react";
+import { Webhook, Copy, ExternalLink, Radio, Send, AlertCircle, CheckCircle2, Shield, Eye, EyeOff, Key, Gauge } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 
@@ -22,9 +22,10 @@ interface WebhookDialogProps {
     webhookId?: string;
     authType?: "none" | "api_key" | "bearer" | "basic";
     authConfig?: Record<string, unknown>;
+    rateLimit?: number;
   };
   initialLabel?: string;
-  onSave: (data: { label: string; config: { path: string; method: string; responseMode?: "waitForResult" | "respondImmediately"; webhookId?: string; authType?: string; authConfig?: Record<string, unknown> } }) => void;
+  onSave: (data: { label: string; config: { path: string; method: string; responseMode?: "waitForResult" | "respondImmediately"; webhookId?: string; authType?: string; authConfig?: Record<string, unknown>; rateLimit?: number } }) => void;
   onTestFlow?: (testData: Record<string, unknown>) => void;
 }
 
@@ -66,6 +67,9 @@ export function WebhookDialog({
   const [basicPassword, setBasicPassword] = useState((initialConfig?.authConfig?.password as string) || "");
   const [showToken, setShowToken] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Rate limiting state
+  const [rateLimit, setRateLimit] = useState(initialConfig?.rateLimit ?? 100);
 
   const createMutation = trpc.webhooks.create.useMutation();
   const updateMutation = trpc.webhooks.update.useMutation();
@@ -99,6 +103,7 @@ export function WebhookDialog({
       setBearerToken((initialConfig?.authConfig?.token as string) || "");
       setBasicUsername((initialConfig?.authConfig?.username as string) || "");
       setBasicPassword((initialConfig?.authConfig?.password as string) || "");
+      setRateLimit(initialConfig?.rateLimit ?? 100);
       
       // Try to find webhookId from config or from existing webhook
       let foundWebhookId = initialConfig?.webhookId;
@@ -174,6 +179,7 @@ export function WebhookDialog({
           responseMode,
           authType,
           authConfig,
+          rateLimit,
         });
       } else {
         // Create new webhook
@@ -185,6 +191,7 @@ export function WebhookDialog({
           responseMode,
           authType,
           authConfig,
+          rateLimit,
         });
         
         // Check for errors in result
@@ -205,6 +212,7 @@ export function WebhookDialog({
           webhookId: webhookId || createMutation.data?.webhook?.id,
           authType,
           authConfig,
+          rateLimit,
         },
       });
 
@@ -575,6 +583,30 @@ export function WebhookDialog({
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Rate Limiting */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Gauge className="h-4 w-4 text-muted-foreground" />
+                <Label className="font-medium">Rate Limiting</Label>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number"
+                  value={rateLimit}
+                  onChange={(e) => setRateLimit(Math.max(0, parseInt(e.target.value) || 0))}
+                  min={0}
+                  max={10000}
+                  className="w-24"
+                />
+                <span className="text-sm text-muted-foreground">requests per minute</span>
+              </div>
+              
+              <p className="text-xs text-muted-foreground">
+                Set to 0 for unlimited. Default is 100 requests per minute.
+              </p>
             </div>
 
             {/* Test Webhook */}

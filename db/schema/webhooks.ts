@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, boolean, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, boolean, jsonb, unique, integer } from "drizzle-orm/pg-core";
 import { workflows } from "./workflows";
 import { organizations } from "./organizations";
 
@@ -21,6 +21,8 @@ export const webhooks = pgTable(
     authConfig: jsonb("auth_config").$type<Record<string, unknown>>(),
     // Request validation schema
     requestSchema: jsonb("request_schema").$type<Record<string, unknown>>(),
+    // Rate limiting (requests per minute, 0 = unlimited)
+    rateLimit: integer("rate_limit").default(100).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
