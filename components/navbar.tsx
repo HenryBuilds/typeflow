@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { NavbarClient } from "./navbar-client";
-import { Workflow, Github } from "lucide-react";
+import { Workflow, Github, Book } from "lucide-react";
 
 export async function Navbar() {
   const currentUser = await getCurrentUser();
@@ -16,6 +16,13 @@ export async function Navbar() {
               <Workflow className="h-4 w-4 text-primary-foreground" />
             </div>
             <span className="text-xl">Typeflow</span>
+          </Link>
+          <Link 
+            href="/docs" 
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Book className="h-4 w-4" />
+            Docs
           </Link>
         </div>
 

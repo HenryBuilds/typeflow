@@ -21,7 +21,6 @@ const docsSections = [
     href: '/docs/workflow-engine',
     colorClass: 'text-chart-3 bg-chart-3/10',
     tags: ['Execution', 'Data Flow', 'Architecture'],
-    comingSoon: true,
   },
   {
     title: 'Triggers & Webhooks',
@@ -30,7 +29,6 @@ const docsSections = [
     href: '/docs/triggers',
     colorClass: 'text-chart-4 bg-chart-4/10',
     tags: ['Webhooks', 'Cron', 'Events'],
-    comingSoon: true,
   },
   {
     title: 'Credentials & Secrets',
@@ -39,7 +37,6 @@ const docsSections = [
     href: '/docs/credentials',
     colorClass: 'text-chart-1 bg-chart-1/10',
     tags: ['Security', 'OAuth', 'API Keys'],
-    comingSoon: true,
   },
   {
     title: 'Testing Workflows',
@@ -48,7 +45,6 @@ const docsSections = [
     href: '/docs/testing',
     colorClass: 'text-chart-2 bg-chart-2/10',
     tags: ['Debugging', 'Testing', 'Breakpoints'],
-    comingSoon: true,
   },
   {
     title: 'Deployment',
@@ -57,7 +53,6 @@ const docsSections = [
     href: '/docs/deployment',
     colorClass: 'text-chart-5 bg-chart-5/10',
     tags: ['Docker', 'Production', 'Scaling'],
-    comingSoon: true,
   },
 ];
 
@@ -112,20 +107,14 @@ export default function DocsPage() {
           {docsSections.map((section) => (
             <Link 
               key={section.title} 
-              href={section.comingSoon ? '#' : section.href}
-              className={section.comingSoon ? 'cursor-not-allowed' : ''}
+              href={section.href}
             >
-              <Card className={`bg-card/50 h-full transition-all hover:border-primary/50 ${section.comingSoon ? 'opacity-60' : ''}`}>
+              <Card className="bg-card/50 h-full transition-all hover:border-primary/50">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className={`w-12 h-12 rounded-lg ${section.colorClass} flex items-center justify-center`}>
                       <section.icon className="h-6 w-6" />
                     </div>
-                    {section.comingSoon && (
-                      <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded">
-                        Coming Soon
-                      </span>
-                    )}
                   </div>
                   <CardTitle className="text-foreground mt-4">{section.title}</CardTitle>
                   <CardDescription>
