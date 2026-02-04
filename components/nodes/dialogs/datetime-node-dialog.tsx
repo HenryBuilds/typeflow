@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ExpressionInput } from "@/components/ui/expression-input";
+import { InputDataItem } from "./types";
 
 interface DateTimeNodeDialogProps {
   open: boolean;
@@ -28,6 +30,8 @@ interface DateTimeNodeDialogProps {
     extractPart?: "year" | "month" | "day" | "hour" | "minute" | "second" | "dayOfWeek";
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: DateTimeNodeDialogProps["initialConfig"] }) => void;
 }
 
@@ -37,6 +41,8 @@ export function DateTimeNodeDialog({
   nodeId,
   initialConfig,
   initialLabel = "DateTime",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: DateTimeNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
@@ -120,11 +126,12 @@ export function DateTimeNodeDialog({
 
           <div>
             <Label htmlFor="inputField">Input Field</Label>
-            <Input
-              id="inputField"
+            <ExpressionInput
               value={inputField}
-              onChange={(e) => setInputField(e.target.value)}
-              placeholder="e.g., data.createdAt"
+              onChange={setInputField}
+              placeholder="e.g., $json.createdAt"
+              inputData={inputData}
+              sourceNodeLabels={sourceNodeLabels}
             />
           </div>
 
@@ -215,3 +222,4 @@ export function DateTimeNodeDialog({
     </Dialog>
   );
 }
+

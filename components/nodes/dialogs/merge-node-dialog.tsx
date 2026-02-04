@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ExpressionInput } from "@/components/ui/expression-input";
+import { InputDataItem } from "./types";
 
 interface MergeNodeDialogProps {
   open: boolean;
@@ -24,6 +26,8 @@ interface MergeNodeDialogProps {
     inputCount?: number;
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: { mode: "append" | "combine" | "mergeByKey"; mergeKey?: string; inputCount?: number } }) => void;
 }
 
@@ -33,6 +37,8 @@ export function MergeNodeDialog({
   nodeId,
   initialConfig,
   initialLabel = "Merge",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: MergeNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
@@ -105,11 +111,12 @@ export function MergeNodeDialog({
           {mode === "mergeByKey" && (
             <div>
               <Label htmlFor="mergeKey">Merge Key Field</Label>
-              <Input
-                id="mergeKey"
+              <ExpressionInput
                 value={mergeKey}
-                onChange={(e) => setMergeKey(e.target.value)}
-                placeholder="e.g., id or data.userId"
+                onChange={setMergeKey}
+                placeholder="e.g., $json.id or $json.userId"
+                inputData={inputData}
+                sourceNodeLabels={sourceNodeLabels}
               />
             </div>
           )}
@@ -142,3 +149,4 @@ export function MergeNodeDialog({
     </Dialog>
   );
 }
+

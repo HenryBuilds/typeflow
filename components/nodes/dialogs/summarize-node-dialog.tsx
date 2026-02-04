@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ExpressionInput } from "@/components/ui/expression-input";
+import { InputDataItem } from "./types";
 
 interface Operation {
   field: string;
@@ -29,6 +31,8 @@ interface SummarizeNodeDialogProps {
     groupBy?: string[];
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: { operations: Operation[]; groupBy: string[] } }) => void;
 }
 
@@ -38,6 +42,8 @@ export function SummarizeNodeDialog({
   nodeId,
   initialConfig,
   initialLabel = "Summarize",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: SummarizeNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
@@ -115,7 +121,7 @@ export function SummarizeNodeDialog({
             <Label className="mb-2 block">Operations</Label>
             <div className="space-y-3">
               {operations.map((op, index) => (
-                <div key={index} className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
+                <div key={index} className="flex items-start gap-2 p-3 border rounded-md bg-muted/30">
                   <div className="flex-1 grid grid-cols-3 gap-2">
                     <Select
                       value={op.operation}
@@ -132,11 +138,12 @@ export function SummarizeNodeDialog({
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input
-                      placeholder="Field (e.g., data.amount)"
+                    <ExpressionInput
                       value={op.field}
-                      onChange={(e) => updateOperation(index, { field: e.target.value })}
-                      disabled={op.operation === "count"}
+                      onChange={(v) => updateOperation(index, { field: v })}
+                      placeholder="Field (e.g., $json.amount)"
+                      inputData={inputData}
+                      sourceNodeLabels={sourceNodeLabels}
                     />
                     <Input
                       placeholder="Output field name"
@@ -150,7 +157,7 @@ export function SummarizeNodeDialog({
                     size="sm"
                     onClick={() => removeOperation(index)}
                     disabled={operations.length === 1}
-                    className="hover:bg-red-100 hover:text-red-600"
+                    className="hover:bg-red-100 hover:text-red-600 mt-1"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -171,11 +178,12 @@ export function SummarizeNodeDialog({
 
           <div>
             <Label htmlFor="groupBy">Group By (optional)</Label>
-            <Input
-              id="groupBy"
+            <ExpressionInput
               value={groupByStr}
-              onChange={(e) => setGroupByStr(e.target.value)}
-              placeholder="e.g., category, region (comma-separated)"
+              onChange={setGroupByStr}
+              placeholder="e.g., $json.category, $json.region (comma-separated)"
+              inputData={inputData}
+              sourceNodeLabels={sourceNodeLabels}
             />
             <p className="text-xs text-muted-foreground mt-1">
               Group results by these fields (comma-separated)
@@ -195,3 +203,4 @@ export function SummarizeNodeDialog({
     </Dialog>
   );
 }
+

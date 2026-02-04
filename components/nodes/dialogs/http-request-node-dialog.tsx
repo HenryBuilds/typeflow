@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Globe, Plus, Trash2 } from "lucide-react";
 import {
   Select,
@@ -14,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ExpressionInput } from "@/components/ui/expression-input";
+import { InputDataItem } from "./types";
 
 interface Header {
   key: string;
@@ -32,6 +33,8 @@ interface HttpRequestNodeDialogProps {
     responseType?: "json" | "text";
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: HttpRequestNodeDialogProps["initialConfig"] }) => void;
 }
 
@@ -41,6 +44,8 @@ export function HttpRequestNodeDialog({
   nodeId,
   initialConfig,
   initialLabel = "HTTP Request",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: HttpRequestNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
@@ -132,11 +137,12 @@ export function HttpRequestNodeDialog({
             </div>
             <div className="col-span-3">
               <Label htmlFor="url">URL</Label>
-              <Input
-                id="url"
+              <ExpressionInput
                 value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://api.example.com/endpoint"
+                onChange={setUrl}
+                placeholder="https://api.example.com/endpoint or $json.url"
+                inputData={inputData}
+                sourceNodeLabels={sourceNodeLabels}
               />
             </div>
           </div>
@@ -163,12 +169,15 @@ export function HttpRequestNodeDialog({
                     onChange={(e) => updateHeader(index, { key: e.target.value })}
                     className="flex-1"
                   />
-                  <Input
-                    placeholder="Value"
-                    value={header.value}
-                    onChange={(e) => updateHeader(index, { value: e.target.value })}
-                    className="flex-1"
-                  />
+                  <div className="flex-1">
+                    <ExpressionInput
+                      value={header.value}
+                      onChange={(v) => updateHeader(index, { value: v })}
+                      placeholder="Value or $json.token"
+                      inputData={inputData}
+                      sourceNodeLabels={sourceNodeLabels}
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
@@ -186,15 +195,16 @@ export function HttpRequestNodeDialog({
           {["POST", "PUT", "PATCH"].includes(method) && (
             <div>
               <Label htmlFor="body">Request Body (JSON)</Label>
-              <Textarea
-                id="body"
+              <ExpressionInput
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder='{"key": "value"}'
-                className="font-mono text-sm min-h-[100px]"
+                onChange={setBody}
+                placeholder='{"key": "value"} or $json.data'
+                inputData={inputData}
+                sourceNodeLabels={sourceNodeLabels}
+                type="json"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Use {"{{field}}"} to reference input data
+                Use expression mode to reference data from previous nodes
               </p>
             </div>
           )}
@@ -225,3 +235,4 @@ export function HttpRequestNodeDialog({
     </Dialog>
   );
 }
+

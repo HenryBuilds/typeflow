@@ -13,9 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ExpressionInput } from "@/components/ui/expression-input";
+import { InputDataItem } from "./types";
 
-interface FieldOperation {
-  action: "set" | "delete" | "rename";
+interface Operation {
+  operation: "set" | "rename" | "remove";
   field: string;
   value?: string;
   newName?: string;
@@ -26,10 +28,12 @@ interface EditFieldsNodeDialogProps {
   onOpenChange: (open: boolean) => void;
   nodeId: string;
   initialConfig?: {
-    operations?: FieldOperation[];
+    operations?: Operation[];
   };
   initialLabel?: string;
-  onSave: (data: { label: string; config: { operations: FieldOperation[] } }) => void;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
+  onSave: (data: { label: string; config: { operations: Operation[] } }) => void;
 }
 
 export function EditFieldsNodeDialog({
@@ -38,22 +42,24 @@ export function EditFieldsNodeDialog({
   nodeId,
   initialConfig,
   initialLabel = "Edit Fields",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: EditFieldsNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
-  const [operations, setOperations] = useState<FieldOperation[]>(
-    initialConfig?.operations || [{ action: "set", field: "", value: "" }]
+  const [operations, setOperations] = useState<Operation[]>(
+    initialConfig?.operations || [{ operation: "set", field: "", value: "" }]
   );
 
   useEffect(() => {
     if (open) {
       setLabel(initialLabel);
-      setOperations(initialConfig?.operations || [{ action: "set", field: "", value: "" }]);
+      setOperations(initialConfig?.operations || [{ operation: "set", field: "", value: "" }]);
     }
   }, [open, initialLabel, initialConfig]);
 
   const addOperation = () => {
-    setOperations([...operations, { action: "set", field: "", value: "" }]);
+    setOperations([...operations, { operation: "set", field: "", value: "" }]);
   };
 
   const removeOperation = (index: number) => {
@@ -62,7 +68,7 @@ export function EditFieldsNodeDialog({
     }
   };
 
-  const updateOperation = (index: number, updates: Partial<FieldOperation>) => {
+  const updateOperation = (index: number, updates: Partial<Operation>) => {
     setOperations(operations.map((op, i) => (i === index ? { ...op, ...updates } : op)));
   };
 
@@ -71,7 +77,7 @@ export function EditFieldsNodeDialog({
     onSave({
       label: label.trim() || "Edit Fields",
       config: {
-        operations: validOperations.length > 0 ? validOperations : [{ action: "set", field: "", value: "" }],
+        operations: validOperations.length > 0 ? validOperations : [{ operation: "set", field: "", value: "" }],
       },
     });
     onOpenChange(false);
@@ -98,47 +104,50 @@ export function EditFieldsNodeDialog({
           </div>
 
           <div>
-            <Label className="mb-2 block">Field Operations</Label>
+            <Label className="mb-2 block">Operations</Label>
             <div className="space-y-3">
               {operations.map((op, index) => (
-                <div key={index} className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
-                  <div className="flex-1 grid grid-cols-3 gap-2">
-                    <Select
-                      value={op.action}
-                      onValueChange={(v) => updateOperation(index, { action: v as FieldOperation["action"] })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="set">Set Value</SelectItem>
-                        <SelectItem value="delete">Delete Field</SelectItem>
-                        <SelectItem value="rename">Rename Field</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      placeholder="Field name"
-                      value={op.field}
-                      onChange={(e) => updateOperation(index, { field: e.target.value })}
-                    />
-                    {op.action === "set" && (
-                      <Input
-                        placeholder="Value (or {{field}} for reference)"
+                <div key={index} className="flex items-start gap-2 p-3 border rounded-md bg-muted/30">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex gap-2">
+                      <Select
+                        value={op.operation}
+                        onValueChange={(v) => updateOperation(index, { operation: v as Operation["operation"] })}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="set">Set</SelectItem>
+                          <SelectItem value="rename">Rename</SelectItem>
+                          <SelectItem value="remove">Remove</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="flex-1">
+                        <ExpressionInput
+                          value={op.field}
+                          onChange={(v) => updateOperation(index, { field: v })}
+                          placeholder="Field name (e.g., $json.email)"
+                          inputData={inputData}
+                          sourceNodeLabels={sourceNodeLabels}
+                        />
+                      </div>
+                    </div>
+                    {op.operation === "set" && (
+                      <ExpressionInput
                         value={op.value || ""}
-                        onChange={(e) => updateOperation(index, { value: e.target.value })}
+                        onChange={(v) => updateOperation(index, { value: v })}
+                        placeholder="Value to set"
+                        inputData={inputData}
+                        sourceNodeLabels={sourceNodeLabels}
                       />
                     )}
-                    {op.action === "rename" && (
+                    {op.operation === "rename" && (
                       <Input
                         placeholder="New field name"
                         value={op.newName || ""}
                         onChange={(e) => updateOperation(index, { newName: e.target.value })}
                       />
-                    )}
-                    {op.action === "delete" && (
-                      <div className="text-xs text-muted-foreground flex items-center">
-                        Field will be removed
-                      </div>
                     )}
                   </div>
                   <Button
@@ -147,7 +156,7 @@ export function EditFieldsNodeDialog({
                     size="sm"
                     onClick={() => removeOperation(index)}
                     disabled={operations.length === 1}
-                    className="hover:bg-red-100 hover:text-red-600"
+                    className="hover:bg-red-100 hover:text-red-600 mt-1"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

@@ -471,11 +471,10 @@ export default function WorkflowEditorPage() {
     );
   }, [workflow, updateWorkflowMutation, organizationId, workflowId, addLog]);
 
-  // Compute input data for the external node dialog based on connections and nodeOutputs
-  const externalNodeInputData = useMemo(() => {
-    if (!editingExternalNode || !workflow) return [];
+  // Generic function to compute input data for any node based on connections and nodeOutputs
+  const getNodeInputData = useCallback((nodeId: string | undefined) => {
+    if (!nodeId || !workflow) return [];
     
-    const nodeId = editingExternalNode.id;
     const connections = workflow.connections || [];
     const nodes = workflow.nodes || [];
     
@@ -502,9 +501,14 @@ export default function WorkflowEditorPage() {
     });
     
     return inputData;
-  }, [editingExternalNode, workflow, nodeOutputs]);
+  }, [workflow, nodeOutputs]);
 
-  // Get source node labels for the external node dialog
+  // Compute input data for the external node dialog based on connections and nodeOutputs
+  const externalNodeInputData = useMemo(() => {
+    return getNodeInputData(editingExternalNode?.id);
+  }, [editingExternalNode, getNodeInputData]);
+
+  // Get source node labels for dialogs
   const sourceNodeLabels = useMemo(() => {
     if (!workflow) return {};
     
@@ -514,6 +518,7 @@ export default function WorkflowEditorPage() {
     });
     return labels;
   }, [workflow]);
+
 
   const handleSave = useCallback(() => {
     if (!workflow) {
@@ -2213,6 +2218,11 @@ export default function WorkflowEditorPage() {
                 setDatabaseDialogOpen(false);
                 setEditingDatabaseNode(null);
               }}
+              inputData={(() => {
+                const nodeInputs = getNodeInputData(editingDatabaseNode?.id);
+                return nodeInputs.length > 0 ? nodeInputs[0].output as Record<string, unknown> : undefined;
+              })()}
+              sourceNodeLabels={Object.values(sourceNodeLabels)}
             />
             
             {/* Debug Panel */}
@@ -2778,6 +2788,8 @@ export default function WorkflowEditorPage() {
           nodeId={editingFilterNode.id}
           initialConfig={editingFilterNode.data?.config as any}
           initialLabel={editingFilterNode.data?.label || "Filter"}
+          inputData={getNodeInputData(editingFilterNode.id)}
+          sourceNodeLabels={sourceNodeLabels}
           onSave={(data) => {
             const currentNodes = getNodesRef.current?.() || [];
             const updatedNodes = currentNodes.map((node) =>
@@ -2895,6 +2907,8 @@ export default function WorkflowEditorPage() {
           nodeId={editingDateTimeNode.id}
           initialConfig={editingDateTimeNode.data?.config as any}
           initialLabel={editingDateTimeNode.data?.label || "DateTime"}
+          inputData={getNodeInputData(editingDateTimeNode.id)}
+          sourceNodeLabels={sourceNodeLabels}
           onSave={(data) => {
             const currentNodes = getNodesRef.current?.() || [];
             const updatedNodes = currentNodes.map((node) =>
@@ -2973,6 +2987,8 @@ export default function WorkflowEditorPage() {
           nodeId={editingMergeNode.id}
           initialConfig={editingMergeNode.data?.config as any}
           initialLabel={editingMergeNode.data?.label || "Merge"}
+          inputData={getNodeInputData(editingMergeNode.id)}
+          sourceNodeLabels={sourceNodeLabels}
           onSave={(data) => {
             const currentNodes = getNodesRef.current?.() || [];
             const updatedNodes = currentNodes.map((node) =>
@@ -3012,6 +3028,8 @@ export default function WorkflowEditorPage() {
           nodeId={editingSplitOutNode.id}
           initialConfig={editingSplitOutNode.data?.config as any}
           initialLabel={editingSplitOutNode.data?.label || "Split Out"}
+          inputData={getNodeInputData(editingSplitOutNode.id)}
+          sourceNodeLabels={sourceNodeLabels}
           onSave={(data) => {
             const currentNodes = getNodesRef.current?.() || [];
             const updatedNodes = currentNodes.map((node) =>
@@ -3051,6 +3069,8 @@ export default function WorkflowEditorPage() {
           nodeId={editingRemoveDuplicatesNode.id}
           initialConfig={editingRemoveDuplicatesNode.data?.config as any}
           initialLabel={editingRemoveDuplicatesNode.data?.label || "Remove Duplicates"}
+          inputData={getNodeInputData(editingRemoveDuplicatesNode.id)}
+          sourceNodeLabels={sourceNodeLabels}
           onSave={(data) => {
             const currentNodes = getNodesRef.current?.() || [];
             const updatedNodes = currentNodes.map((node) =>
@@ -3090,6 +3110,8 @@ export default function WorkflowEditorPage() {
           nodeId={editingSummarizeNode.id}
           initialConfig={editingSummarizeNode.data?.config as any}
           initialLabel={editingSummarizeNode.data?.label || "Summarize"}
+          inputData={getNodeInputData(editingSummarizeNode.id)}
+          sourceNodeLabels={sourceNodeLabels}
           onSave={(data) => {
             const currentNodes = getNodesRef.current?.() || [];
             const updatedNodes = currentNodes.map((node) =>
@@ -3129,6 +3151,8 @@ export default function WorkflowEditorPage() {
           nodeId={editingEditFieldsNode.id}
           initialConfig={editingEditFieldsNode.data?.config as any}
           initialLabel={editingEditFieldsNode.data?.label || "Edit Fields"}
+          inputData={getNodeInputData(editingEditFieldsNode.id)}
+          sourceNodeLabels={sourceNodeLabels}
           onSave={(data) => {
             const currentNodes = getNodesRef.current?.() || [];
             const updatedNodes = currentNodes.map((node) =>
@@ -3168,6 +3192,8 @@ export default function WorkflowEditorPage() {
           nodeId={editingHttpRequestNode.id}
           initialConfig={editingHttpRequestNode.data?.config as any}
           initialLabel={editingHttpRequestNode.data?.label || "HTTP Request"}
+          inputData={getNodeInputData(editingHttpRequestNode.id)}
+          sourceNodeLabels={sourceNodeLabels}
           onSave={(data) => {
             const currentNodes = getNodesRef.current?.() || [];
             const updatedNodes = currentNodes.map((node) =>

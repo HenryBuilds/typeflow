@@ -32,11 +32,7 @@ interface ExternalNodeInfo {
   }>;
 }
 
-interface InputDataItem {
-  sourceNodeId: string;
-  output: unknown;
-  sourceNodeLabel?: string;
-}
+import { InputDataItem } from "./types";
 
 interface ExternalNodeDialogProps {
   open: boolean;

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Copy } from "lucide-react";
+import { ExpressionInput } from "@/components/ui/expression-input";
+import { InputDataItem } from "./types";
 
 interface RemoveDuplicatesNodeDialogProps {
   open: boolean;
@@ -15,6 +17,8 @@ interface RemoveDuplicatesNodeDialogProps {
     field?: string;
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: { field: string } }) => void;
 }
 
@@ -24,6 +28,8 @@ export function RemoveDuplicatesNodeDialog({
   nodeId,
   initialConfig,
   initialLabel = "Remove Duplicates",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: RemoveDuplicatesNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
@@ -68,11 +74,12 @@ export function RemoveDuplicatesNodeDialog({
 
           <div>
             <Label htmlFor="field">Comparison Field</Label>
-            <Input
-              id="field"
+            <ExpressionInput
               value={field}
-              onChange={(e) => setField(e.target.value)}
-              placeholder="e.g., id or data.email"
+              onChange={setField}
+              placeholder="e.g., $json.id or $json.email"
+              inputData={inputData}
+              sourceNodeLabels={sourceNodeLabels}
             />
             <p className="text-xs text-muted-foreground mt-1">
               Field used to compare items for duplicates. Leave empty to compare entire objects.
@@ -92,3 +99,4 @@ export function RemoveDuplicatesNodeDialog({
     </Dialog>
   );
 }
+

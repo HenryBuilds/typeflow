@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ExpressionInput } from "@/components/ui/expression-input";
+import { InputDataItem } from "./types";
 
 interface Condition {
   field: string;
@@ -29,6 +31,8 @@ interface FilterNodeDialogProps {
     combineWith?: "and" | "or";
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: { conditions: Condition[]; combineWith: "and" | "or" } }) => void;
 }
 
@@ -38,6 +42,8 @@ export function FilterNodeDialog({
   nodeId,
   initialConfig,
   initialLabel = "Filter",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: FilterNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
@@ -127,35 +133,41 @@ export function FilterNodeDialog({
 
             <div className="space-y-3">
               {conditions.map((condition, index) => (
-                <div key={index} className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
-                  <div className="flex-1 grid grid-cols-3 gap-2">
-                    <Input
-                      placeholder="Field (e.g., data.status)"
-                      value={condition.field}
-                      onChange={(e) => updateCondition(index, { field: e.target.value })}
-                    />
-                    <Select
-                      value={condition.operator}
-                      onValueChange={(v) => updateCondition(index, { operator: v as Condition["operator"] })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {operators.map((op) => (
-                          <SelectItem key={op.value} value={op.value}>
-                            {op.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {!["isEmpty", "isNotEmpty"].includes(condition.operator) && (
-                      <Input
-                        placeholder="Value"
-                        value={condition.value}
-                        onChange={(e) => updateCondition(index, { value: e.target.value })}
+                <div key={index} className="flex items-start gap-2 p-3 border rounded-md bg-muted/30">
+                  <div className="flex-1 space-y-2">
+                    <div className="grid grid-cols-3 gap-2">
+                      <ExpressionInput
+                        value={condition.field}
+                        onChange={(v) => updateCondition(index, { field: v })}
+                        placeholder="Field (e.g., $json.status)"
+                        inputData={inputData}
+                        sourceNodeLabels={sourceNodeLabels}
                       />
-                    )}
+                      <Select
+                        value={condition.operator}
+                        onValueChange={(v) => updateCondition(index, { operator: v as Condition["operator"] })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {operators.map((op) => (
+                            <SelectItem key={op.value} value={op.value}>
+                              {op.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {!["isEmpty", "isNotEmpty"].includes(condition.operator) && (
+                        <ExpressionInput
+                          value={condition.value}
+                          onChange={(v) => updateCondition(index, { value: v })}
+                          placeholder="Value"
+                          inputData={inputData}
+                          sourceNodeLabels={sourceNodeLabels}
+                        />
+                      )}
+                    </div>
                   </div>
                   <Button
                     type="button"
@@ -163,7 +175,7 @@ export function FilterNodeDialog({
                     size="sm"
                     onClick={() => removeCondition(index)}
                     disabled={conditions.length === 1}
-                    className="hover:bg-red-100 hover:text-red-600"
+                    className="hover:bg-red-100 hover:text-red-600 mt-1"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -196,3 +208,4 @@ export function FilterNodeDialog({
     </Dialog>
   );
 }
+

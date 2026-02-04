@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SplitSquareVertical } from "lucide-react";
+import { ExpressionInput } from "@/components/ui/expression-input";
+import { InputDataItem } from "./types";
 
 interface SplitOutNodeDialogProps {
   open: boolean;
@@ -15,6 +17,8 @@ interface SplitOutNodeDialogProps {
     fieldToSplit?: string;
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: { fieldToSplit: string } }) => void;
 }
 
@@ -24,6 +28,8 @@ export function SplitOutNodeDialog({
   nodeId,
   initialConfig,
   initialLabel = "Split Out",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: SplitOutNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
@@ -68,11 +74,12 @@ export function SplitOutNodeDialog({
 
           <div>
             <Label htmlFor="fieldToSplit">Field to Split</Label>
-            <Input
-              id="fieldToSplit"
+            <ExpressionInput
               value={fieldToSplit}
-              onChange={(e) => setFieldToSplit(e.target.value)}
-              placeholder="e.g., data.items or results"
+              onChange={setFieldToSplit}
+              placeholder="e.g., $json.items or $json.results"
+              inputData={inputData}
+              sourceNodeLabels={sourceNodeLabels}
             />
             <p className="text-xs text-muted-foreground mt-1">
               The array field that will be split into separate items
@@ -92,3 +99,4 @@ export function SplitOutNodeDialog({
     </Dialog>
   );
 }
+
