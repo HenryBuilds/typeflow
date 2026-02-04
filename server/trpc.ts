@@ -3,27 +3,44 @@ import type { Context } from "./context";
 import { db } from "@/db/db";
 import { organizations, organizationMembers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { apiRateLimiter } from "@/lib/rate-limiter";
 
 const t = initTRPC.context<Context>().create();
 
 export const router = t.router;
 export const publicProcedure = t.procedure;
 
-export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
-  if (!ctx.userId) {
+// Rate limiting middleware for API routes
+const rateLimitMiddleware = t.middleware(async ({ ctx, next }) => {
+  const rateLimitResult = await apiRateLimiter.check(ctx.clientIp);
+  
+  if (!rateLimitResult.allowed) {
     throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "You must be logged in",
+      code: "TOO_MANY_REQUESTS",
+      message: `Rate limit exceeded. Try again in ${rateLimitResult.resetTime - Math.floor(Date.now() / 1000)} seconds.`,
     });
   }
 
-  return next({
-    ctx: {
-      ...ctx,
-      userId: ctx.userId,
-    },
-  });
+  return next({ ctx });
 });
+
+export const protectedProcedure = t.procedure
+  .use(rateLimitMiddleware)
+  .use(async ({ ctx, next }) => {
+    if (!ctx.userId) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "You must be logged in",
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        userId: ctx.userId,
+      },
+    });
+  });
 
 import { z } from "zod";
 
