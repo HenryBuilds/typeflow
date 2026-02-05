@@ -22,6 +22,7 @@ import {
   executeEditFieldsNode,
   executeIfNode,
   executeSwitchNode,
+  executeThrowErrorNode,
   ConditionalExecutionResult
 } from "./data-transform-executor";
 import { 
@@ -262,6 +263,12 @@ export class WorkflowExecutor {
           outputItems = inputItems.length > 0 ? inputItems : [{ json: {} }];
         } else if (currentNode.type === "noop") {
           // No operation - pass through
+          outputItems = inputItems;
+        } else if (currentNode.type === "throwError") {
+          // Throw Error node - throws a user-defined error
+          executeThrowErrorNode(currentNode, inputItems);
+        } else if (currentNode.type === "tryCatch") {
+          // Try/Catch node - pass through to success output
           outputItems = inputItems;
         } else if (currentNode.type === "postgres") {
           outputItems = await executePostgresNode(currentNode, inputItems, organizationId);
@@ -568,6 +575,40 @@ export class WorkflowExecutor {
         } else if (currentNode.type === "noop") {
           // No operation - pass through
           outputItems = inputItems;
+        } else if (currentNode.type === "throwError") {
+          // Throw Error node - throws a user-defined error
+          executeThrowErrorNode(currentNode, inputItems);
+        } else if (currentNode.type === "tryCatch") {
+          // Try/Catch node - routes to success output, errors are caught by the executor
+          // The actual error catching happens at the workflow level
+          // This node just passes through data to the success output
+          outputItems = inputItems;
+          
+          // Store output for success handle routing
+          const nextConnections = workflowConnections.filter(
+            (c) => c.sourceNodeId === currentNodeId
+          );
+          
+          for (const conn of nextConnections) {
+            const sourceHandle = conn.sourceHandle || "success";
+            // Only route to success handle during normal execution
+            if (sourceHandle === "success" && !executedNodes.has(conn.targetNodeId)) {
+              nodeOutputs.set(`${currentNodeId}:${conn.targetNodeId}`, outputItems);
+              executionQueue.push(conn.targetNodeId);
+            }
+          }
+          
+          // Skip normal queue addition
+          const duration = Date.now() - startTime;
+          nodeOutputs.set(currentNodeId, outputItems);
+          nodeResults[currentNodeId] = {
+            nodeId: currentNodeId,
+            nodeLabel: currentNode?.label,
+            status: "completed",
+            output: outputItems,
+            duration,
+          };
+          continue;
         } else if (currentNode.type === "postgres") {
           outputItems = await executePostgresNode(currentNode, inputItems, organizationId);
         } else if (currentNode.type === "mysql") {
@@ -670,15 +711,17 @@ export class WorkflowExecutor {
           }
           
         } else if (currentNode.type === "if") {
-          // IF node - conditional routing to true/false outputs
+          // IF node - conditional routing to branch outputs
           const conditionalResult = executeIfNode(currentNode, inputItems);
           
-          // Store conditional outputs for routing
-          const trueItems = conditionalResult.outputs["true"] || [];
-          const falseItems = conditionalResult.outputs["false"] || [];
+          // Get the config to understand branch structure
+          const ifConfig = currentNode.config as {
+            branches?: Array<{ id: string; name: string }>;
+            elseEnabled?: boolean;
+          };
           
-          // For IF nodes, store combined output for display, but route items separately
-          outputItems = [...trueItems, ...falseItems];
+          // Collect all outputs for display
+          outputItems = Object.values(conditionalResult.outputs).flat();
           
           // Route items to connected nodes based on source handle
           const nextConnections = workflowConnections.filter(
@@ -686,8 +729,30 @@ export class WorkflowExecutor {
           );
           
           for (const conn of nextConnections) {
-            const sourceHandle = conn.sourceHandle || "true"; // Default to true
-            const relevantItems = sourceHandle === "true" ? trueItems : falseItems;
+            const sourceHandle = conn.sourceHandle;
+            
+            // Find the matching output based on sourceHandle
+            // sourceHandle can be: branch name (like "if"), branch ID, or "else"
+            let relevantItems: ExecutionItem[] = [];
+            
+            if (sourceHandle === "else") {
+              relevantItems = conditionalResult.outputs["else"] || [];
+            } else if (sourceHandle) {
+              // Try to match by branch name first (e.g., "if" from sourceHandle matches branch.name)
+              const matchingBranch = ifConfig?.branches?.find(b => b.name === sourceHandle);
+              if (matchingBranch) {
+                relevantItems = conditionalResult.outputs[matchingBranch.id] || [];
+              } else {
+                // Fall back to direct ID match
+                relevantItems = conditionalResult.outputs[sourceHandle] || [];
+              }
+            } else {
+              // No sourceHandle - default to first branch's output
+              const firstBranch = ifConfig?.branches?.[0];
+              if (firstBranch) {
+                relevantItems = conditionalResult.outputs[firstBranch.id] || [];
+              }
+            }
             
             // Only add to queue if there are items to pass and not already executed
             if (relevantItems.length > 0 && !executedNodes.has(conn.targetNodeId)) {

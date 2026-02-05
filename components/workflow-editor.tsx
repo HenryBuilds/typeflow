@@ -49,6 +49,8 @@ import { MongoDBNode } from "./nodes/mongodb-node";
 import { RedisNode } from "./nodes/redis-node";
 import { IfNode } from "./nodes/if-node";
 import { SwitchNode } from "./nodes/switch-node";
+import { ThrowErrorNode } from "./nodes/throw-error-node";
+import { TryCatchNode } from "./nodes/try-catch-node";
 import { CodeEditorDialog } from "./code-editor-dialog";
 import { DeletableEdge } from "./deletable-edge";
 import { Workflow, WorkflowNode as WorkflowNodeType, WorkflowConnection } from "@/types/domain";
@@ -86,6 +88,8 @@ const nodeTypes: NodeTypes = {
   redis: RedisNode,
   if: IfNode,
   switch: SwitchNode,
+  throwError: ThrowErrorNode,
+  tryCatch: TryCatchNode,
 };
 
 const edgeTypes = {
@@ -144,6 +148,7 @@ interface WorkflowEditorProps {
   // Callbacks for conditional nodes
   onIfEdit?: (nodeId: string, node: Node) => void;
   onSwitchEdit?: (nodeId: string, node: Node) => void;
+  onThrowErrorEdit?: (nodeId: string, node: Node) => void;
   // External nodes from node loader
   externalNodes?: Array<{
     name: string;
@@ -207,6 +212,7 @@ export function WorkflowEditor({
   onDatabaseNodeEdit,
   onIfEdit,
   onSwitchEdit,
+  onThrowErrorEdit,
   externalNodes = [],
   // Debug mode props
   debugMode = false,
@@ -295,6 +301,20 @@ export function WorkflowEditor({
       const sourceStatus = nodeOutputs?.[edge.source]?.status;
       const targetStatus = nodeOutputs?.[edge.target]?.status;
       
+      // For conditional nodes (if/switch), don't show green edge if target wasn't executed
+      // This prevents the "unexecuted branch" from showing as green
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      const isConditionalSource = sourceNode?.type === "if" || sourceNode?.type === "switch";
+      
+      if (isConditionalSource && sourceStatus === "completed" && !targetStatus) {
+        // Conditional node completed but this branch's target wasn't executed
+        // Keep the edge default (gray/not highlighted)
+        return {
+          ...edge,
+          type: 'deletable',
+        };
+      }
+      
       // Both nodes completed - green edge
       if (sourceStatus === "completed" && targetStatus === "completed") {
         return {
@@ -315,7 +335,7 @@ export function WorkflowEditor({
         };
       }
       
-      // Source completed - green edge
+      // Source completed - green edge (for non-conditional nodes or if target will run)
       if (sourceStatus === "completed") {
         return {
           ...edge,
@@ -1013,6 +1033,46 @@ export function WorkflowEditor({
           },
         };
       }
+      // Error handling nodes
+      if (node.type === "throwError") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onEdit: (nodeId: string) => {
+              if (onThrowErrorEdit) {
+                onThrowErrorEdit(nodeId, node);
+              }
+            },
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
+          },
+        };
+      }
+      if (node.type === "tryCatch") {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            onExecute: onExecuteNode,
+            onDelete: handleDeleteNode,
+            isExecuting: executingNodeId === node.id,
+            executionStatus,
+            errorMessage,
+            inputData,
+            hasBreakpoint: breakpoints.has(node.id),
+            isBreakpointActive: debugMode && debugCurrentNodeId === node.id,
+            onToggleBreakpoint,
+          },
+        };
+      }
       return {
         ...node,
         data: {
@@ -1030,7 +1090,7 @@ export function WorkflowEditor({
         },
       };
     });
-  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit, onExternalNodeEdit, onDatabaseNodeEdit, onIfEdit, onSwitchEdit, debugMode, breakpoints, debugCurrentNodeId, onToggleBreakpoint]);
+  }, [nodes, edges, nodeOutputs, findAllPredecessorNodes, calculateNodeDistance, onExecuteNode, executingNodeId, handleDeleteNode, organizationId, workflow.isActive, onWebhookEdit, onExecuteWorkflowEdit, onWorkflowInputEdit, onWorkflowOutputEdit, onFilterEdit, onLimitEdit, onHttpRequestEdit, onEditFieldsEdit, onWaitEdit, onDateTimeEdit, onAggregateEdit, onMergeEdit, onSplitOutEdit, onRemoveDuplicatesEdit, onSummarizeEdit, onScheduleTriggerEdit, onChatTriggerEdit, onExternalNodeEdit, onDatabaseNodeEdit, onIfEdit, onSwitchEdit, onThrowErrorEdit, debugMode, breakpoints, debugCurrentNodeId, onToggleBreakpoint]);
 
   const handleCodeSave = useCallback(
     (data: { code: string; label: string }) => {
@@ -1199,6 +1259,8 @@ export function WorkflowEditor({
         redis: "Redis",
         if: "IF",
         switch: "Switch",
+        throwError: "Throw Error",
+        tryCatch: "Try / Catch",
       };
       const baseLabel = labelMap[type] || "Node";
       const uniqueLabel = generateUniqueLabel(baseLabel, nodes);

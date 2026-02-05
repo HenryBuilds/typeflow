@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search, Lock, Database, Square, GitFork, LayoutList } from "lucide-react";
+import { ArrowLeft, Save, Play, Loader2, Code, Zap, Plus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, FileType, Package, Webhook, Send, Bug, Download, Info, Wrench, Power, Copy, Check, History, GitBranch, Upload, Filter, ArrowDown, SplitSquareVertical, ListPlus, GitMerge, Calculator, Clock, PenLine, Globe, Timer, ArrowRight, MousePointer, MessageSquare, ChevronDown, Search, Lock, Database, Square, GitFork, LayoutList, AlertTriangle, ShieldCheck } from "lucide-react";
 import { WorkflowEditor } from "@/components/workflow-editor";
 import { NodeOutputPanel } from "@/components/node-output-panel";
 import { WorkflowLogPanel, WorkflowLog } from "@/components/workflow-log-panel";
@@ -46,6 +46,7 @@ import {
   DatabaseNodeDialog,
   IfNodeDialog,
   SwitchNodeDialog,
+  ThrowErrorNodeDialog,
 } from "@/components/nodes/dialogs";
 import { WorkflowVersionsPanel } from "@/components/workflow-versions-panel";
 import { useSaveWorkflow, useWorkflow, useUpdateWorkflow } from "@/hooks/use-workflows";
@@ -147,6 +148,9 @@ export default function WorkflowEditorPage() {
   const [editingIfNode, setEditingIfNode] = useState<Node | null>(null);
   const [switchDialogOpen, setSwitchDialogOpen] = useState(false);
   const [editingSwitchNode, setEditingSwitchNode] = useState<Node | null>(null);
+  // Throw Error node dialog
+  const [throwErrorDialogOpen, setThrowErrorDialogOpen] = useState(false);
+  const [editingThrowErrorNode, setEditingThrowErrorNode] = useState<Node | null>(null);
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [debugStateDialogOpen, setDebugStateDialogOpen] = useState(false);
   const [versionsPanelOpen, setVersionsPanelOpen] = useState(false);
@@ -2009,6 +2013,62 @@ export default function WorkflowEditorPage() {
               </div>
               )}
 
+              {/* Error Handling Section */}
+              {(!nodeSearch || ["throw error", "try catch", "error"].some(n => n.includes(nodeSearch.toLowerCase()))) && (
+              <div className="mb-4">
+                <button 
+                  type="button"
+                  onClick={() => setCollapsedCategories(prev => ({ ...prev, errorHandling: !prev.errorHandling }))}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 hover:text-foreground transition-colors"
+                >
+                  <span>Error Handling</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${collapsedCategories.errorHandling ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsedCategories.errorHandling && (
+                <div className="space-y-1.5">
+                  {matchesSearch("throw error") && (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "throwError");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <AlertTriangle className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Throw Error</span>
+                        <p className="text-xs text-muted-foreground truncate">Throw custom error</p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                  {matchesSearch("try catch") && (
+                  <div
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/reactflow", "tryCatch");
+                    }}
+                    className="group p-2.5 rounded-lg border border-border bg-card hover:bg-accent hover:border-primary/50 cursor-move transition-all duration-200"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-500/10 flex items-center justify-center group-hover:bg-gray-500/20 transition-colors">
+                        <ShieldCheck className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">Try / Catch</span>
+                        <p className="text-xs text-muted-foreground truncate">Catch errors</p>
+                      </div>
+                    </div>
+                  </div>
+                  )}
+                </div>
+                )}
+              </div>
+              )}
+
               {/* Custom Nodes Section */}
               {externalNodes && externalNodes.length > 0 && 
               (!nodeSearch || externalNodes.some(n => n.displayName.toLowerCase().includes(nodeSearch.toLowerCase()))) && (
@@ -2207,6 +2267,10 @@ export default function WorkflowEditorPage() {
                 onSwitchEdit={(nodeId, node) => {
                   setEditingSwitchNode(node);
                   setSwitchDialogOpen(true);
+                }}
+                onThrowErrorEdit={(nodeId, node) => {
+                  setEditingThrowErrorNode(node);
+                  setThrowErrorDialogOpen(true);
                 }}
               />
             </div>
@@ -3582,6 +3646,46 @@ export default function WorkflowEditorPage() {
                 onSuccess: async () => {
                   setSwitchDialogOpen(false);
                   setEditingSwitchNode(null);
+                },
+              }
+            );
+          }}
+        />
+      )}
+
+      {/* Throw Error Node Dialog */}
+      {editingThrowErrorNode && (
+        <ThrowErrorNodeDialog
+          open={throwErrorDialogOpen}
+          onOpenChange={(open) => {
+            setThrowErrorDialogOpen(open);
+            if (!open) setEditingThrowErrorNode(null);
+          }}
+          initialConfig={editingThrowErrorNode.data?.config as any}
+          initialLabel={editingThrowErrorNode.data?.label || "Throw Error"}
+          onSave={(data) => {
+            const currentNodes = getNodesRef.current?.() || [];
+            const updatedNodes = currentNodes.map((node) =>
+              node.id === editingThrowErrorNode.id
+                ? { ...node, data: { ...node.data, label: data.label, config: data.config } }
+                : node
+            );
+            if (setNodesRef.current) {
+              setNodesRef.current(updatedNodes);
+            }
+            const currentEdges = getEdgesRef.current?.() || [];
+            saveMutation.mutate(
+              {
+                organizationId,
+                workflowId: workflow.id,
+                workflow: { name: workflow.name, description: workflow.description || undefined, version: workflow.version, metadata: workflow.metadata || undefined },
+                nodes: updatedNodes.map((node) => ({ id: node.id, type: node.type || "workflow", label: node.data.label || "Node", position: node.position, config: node.data.config || {}, executionOrder: 0 })),
+                connections: currentEdges.map((edge) => ({ id: edge.id || undefined, sourceNodeId: edge.source, targetNodeId: edge.target, sourceHandle: edge.sourceHandle || undefined, targetHandle: edge.targetHandle || undefined })),
+              },
+              {
+                onSuccess: async () => {
+                  setThrowErrorDialogOpen(false);
+                  setEditingThrowErrorNode(null);
                 },
               }
             );

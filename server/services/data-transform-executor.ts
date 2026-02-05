@@ -9,7 +9,15 @@ import type { ExecutionItem } from "@/types/execution";
 
 // Helper: Get nested value from object by dot-notation path
 export function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const keys = path.split(".");
+  // Strip common prefixes like $json. since obj is already the json object
+  let normalizedPath = path;
+  if (normalizedPath.startsWith("$json.")) {
+    normalizedPath = normalizedPath.slice(6); // Remove "$json."
+  } else if (normalizedPath === "$json") {
+    return obj; // Return the whole object
+  }
+  
+  const keys = normalizedPath.split(".");
   let current: unknown = obj;
   for (const key of keys) {
     if (current === null || current === undefined) return undefined;
@@ -678,4 +686,24 @@ export function executeSwitchNode(
   }
 
   return { outputs };
+}
+
+// Throw Error Node Execution - throws a user-defined error
+export function executeThrowErrorNode(
+  node: typeof nodes.$inferSelect,
+  inputItems: ExecutionItem[]
+): never {
+  const config = node.config as {
+    errorMessage?: string;
+    errorType?: string;
+  };
+
+  const errorMessage = config?.errorMessage || "An error occurred";
+  const errorType = config?.errorType || "Error";
+
+  // Create a custom error with the configured message
+  const error = new Error(`[${errorType}] ${errorMessage}`);
+  error.name = errorType;
+  
+  throw error;
 }
