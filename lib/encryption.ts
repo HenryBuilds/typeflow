@@ -1,11 +1,9 @@
 import crypto from 'crypto';
+import { env } from '@/lib/env';
 
-// Encryption key from environment variable (must be 32 bytes for AES-256)
+// Encryption key from validated environment (must be 32 bytes for AES-256)
 const getEncryptionKey = (): Buffer => {
-  const key = process.env.ENCRYPTION_KEY;
-  if (!key) {
-    throw new Error('ENCRYPTION_KEY environment variable is not set');
-  }
+  const key = env.ENCRYPTION_KEY;
   
   // If the key is not exactly 32 bytes, hash it to get 32 bytes
   if (key.length !== 64) { // 32 bytes = 64 hex characters
