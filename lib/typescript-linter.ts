@@ -1390,15 +1390,24 @@ declare const $credentials: Record<string, any>;
             "is not a module",
             "Cannot redeclare",
             "Duplicate identifier",
-            "Module",
-            "import",
-            "Top-level 'await'", // Code is wrapped in async function at runtime
-            "'await' expressions are only allowed", // Top-level await is allowed in wrapped code
-            "'return' statement can only be used", // Return is allowed - code is in a function at runtime
-            "A 'return' statement can only be used", // Same as above
-            "does not exist on type '{}'", // False positive when TypeScript can't infer literal types
-            "does not exist on type 'never'", // False positive with empty arrays
-            "Property 'length' does not exist", // Common false positive with arrays
+            // ESM module system errors that are handled at runtime
+            "An import declaration can only be used",
+            "import declaration can only be used at the top level",
+            "'import' and 'export' may appear only",
+            "A default export must be at the top level",
+            "default export must be at the top level",
+            "cannot have multiple default exports",
+            "Multiple exports of name",
+            "export declaration can only be used",
+            // Await/return wrapped in async function at runtime
+            "Top-level 'await'",
+            "'await' expressions are only allowed",
+            "'return' statement can only be used",
+            "A 'return' statement can only be used",
+            // False positives with dynamic types
+            "does not exist on type '{}'",
+            "does not exist on type 'never'",
+            "Property 'length' does not exist",
 
           ];
           

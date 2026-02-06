@@ -982,6 +982,56 @@ ${utilities.map(util => {
             }
           }
           
+          // Match ES module imports: import X from, import { X, Y } from, import * as X from
+          // Default imports: import X from 'module'
+          const defaultImportRegex = /import\s+(\w+)\s+from\s+['"][^'"]+['"]?/g;
+          while ((match = defaultImportRegex.exec(fullCode)) !== null) {
+            const name = match[1];
+            if (!userSymbols.some(s => s.label === name)) {
+              userSymbols.push({
+                label: name,
+                type: 'function',
+                info: 'Imported default export',
+                boost: 160, // Higher priority than other symbols
+              });
+            }
+          }
+          
+          // Named imports: import { X, Y, Z as Alias } from 'module'
+          const namedImportRegex = /import\s*\{([^}]+)\}\s*from\s+['"][^'"]+['"]?/g;
+          while ((match = namedImportRegex.exec(fullCode)) !== null) {
+            const importsStr = match[1];
+            // Split by comma and extract names (handling 'as' aliases)
+            const imports = importsStr.split(',').map(s => s.trim());
+            imports.forEach(imp => {
+              // Handle 'X as Alias' - use Alias as the symbol name
+              const aliasMatch = imp.match(/(\w+)\s+as\s+(\w+)/);
+              const name = aliasMatch ? aliasMatch[2] : imp.split(' ')[0];
+              if (name && !userSymbols.some(s => s.label === name)) {
+                userSymbols.push({
+                  label: name,
+                  type: 'function',
+                  info: 'Imported from module',
+                  boost: 160,
+                });
+              }
+            });
+          }
+          
+          // Namespace imports: import * as X from 'module'
+          const namespaceImportRegex = /import\s+\*\s+as\s+(\w+)\s+from\s+['"][^'"]+['"]?/g;
+          while ((match = namespaceImportRegex.exec(fullCode)) !== null) {
+            const name = match[1];
+            if (!userSymbols.some(s => s.label === name)) {
+              userSymbols.push({
+                label: name,
+                type: 'namespace',
+                info: 'Imported namespace',
+                boost: 160,
+              });
+            }
+          }
+          
           // Combine user symbols with keywords, user symbols first
           const allOptions = [...userSymbols, ...jsKeywords];
           

@@ -306,6 +306,16 @@ ${utilitiesDeclarations}
         "is not a module",
         "Cannot redeclare",
         "Duplicate identifier",
+        // ESM module system errors handled at runtime
+        "An import declaration can only be used",
+        "import declaration can only be used at the top level",
+        "'import' and 'export' may appear only",
+        "A default export must be at the top level",
+        "default export must be at the top level",
+        "cannot have multiple default exports",
+        "Multiple exports of name",
+        "export declaration can only be used",
+        // Await/return wrapped in function
         "Top-level 'await'",
         "'await' expressions are only allowed",
         "'return' statement can only be used",
