@@ -98,7 +98,7 @@ export const PostgresNode = memo(({ data, selected, id }: NodeProps<PostgresNode
       onToggleBreakpoint={data.onToggleBreakpoint}
     >
       <div
-        className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 min-w-[180px] cursor-pointer ${getStatusStyles()}`}
+        className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 min-w-[180px] max-w-[280px] cursor-pointer ${getStatusStyles()}`}
         onDoubleClick={handleDoubleClick}
         title="Double-click to configure"
       >
@@ -109,11 +109,11 @@ export const PostgresNode = memo(({ data, selected, id }: NodeProps<PostgresNode
       />
 
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-slate-600" />
-          <div>
-            <div className="font-bold text-sm">{data.label || "PostgreSQL"}</div>
-            <div className="text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Database className="h-4 w-4 text-slate-600 flex-shrink-0" />
+          <div className="min-w-0">
+            <div className="font-bold text-sm truncate">{data.label || "PostgreSQL"}</div>
+            <div className="text-xs text-muted-foreground truncate max-w-[160px]">
               {credentialName ? `${operation} • ${credentialName}` : operation}
             </div>
           </div>
