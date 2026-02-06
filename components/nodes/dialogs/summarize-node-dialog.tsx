@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { ExpressionInput } from "@/components/ui/expression-input";
 import { InputDataItem } from "./types";
+import { NodeDialogLayout } from "./node-dialog-layout";
 
 interface Operation {
   field: string;
@@ -26,6 +27,7 @@ interface SummarizeNodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeId: string;
+  organizationId?: string;
   initialConfig?: {
     operations?: Operation[];
     groupBy?: string[];
@@ -40,6 +42,7 @@ export function SummarizeNodeDialog({
   open,
   onOpenChange,
   nodeId,
+  organizationId,
   initialConfig,
   initialLabel = "Summarize",
   inputData = [],
@@ -99,13 +102,15 @@ export function SummarizeNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5 text-gray-500" />
-            Configure Summarize
-          </DialogTitle>
-        </DialogHeader>
+      <NodeDialogLayout
+        title="Configure Summarize"
+        icon={<Calculator className="h-5 w-5 text-gray-500" />}
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+      >
         <div className="space-y-4">
           <div>
             <Label htmlFor="label">Node Label</Label>
@@ -199,8 +204,7 @@ export function SummarizeNodeDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </NodeDialogLayout>
     </Dialog>
   );
 }
-

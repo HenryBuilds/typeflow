@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,16 +13,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { InputDataItem } from "./types";
+import { NodeDialogLayout } from "./node-dialog-layout";
 
 interface LimitNodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeId: string;
+  organizationId?: string;
   initialConfig?: {
     limit?: number;
     keep?: "first" | "last";
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: { limit: number; keep: "first" | "last" } }) => void;
 }
 
@@ -30,8 +35,11 @@ export function LimitNodeDialog({
   open,
   onOpenChange,
   nodeId,
+  organizationId,
   initialConfig,
   initialLabel = "Limit",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: LimitNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
@@ -59,13 +67,15 @@ export function LimitNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Hash className="h-5 w-5 text-gray-500" />
-            Configure Limit
-          </DialogTitle>
-        </DialogHeader>
+      <NodeDialogLayout
+        title="Configure Limit"
+        icon={<Hash className="h-5 w-5 text-gray-500" />}
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+      >
         <div className="space-y-4">
           <div>
             <Label htmlFor="label">Node Label</Label>
@@ -113,7 +123,7 @@ export function LimitNodeDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </NodeDialogLayout>
     </Dialog>
   );
 }

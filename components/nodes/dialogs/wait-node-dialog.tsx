@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,16 +13,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { InputDataItem } from "./types";
+import { NodeDialogLayout } from "./node-dialog-layout";
 
 interface WaitNodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeId: string;
+  organizationId?: string;
   initialConfig?: {
     waitTime?: number;
     unit?: "seconds" | "minutes";
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: { waitTime: number; unit: "seconds" | "minutes" } }) => void;
 }
 
@@ -30,8 +35,11 @@ export function WaitNodeDialog({
   open,
   onOpenChange,
   nodeId,
+  organizationId,
   initialConfig,
   initialLabel = "Wait",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: WaitNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
@@ -61,13 +69,15 @@ export function WaitNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-gray-500" />
-            Configure Wait
-          </DialogTitle>
-        </DialogHeader>
+      <NodeDialogLayout
+        title="Configure Wait"
+        icon={<Clock className="h-5 w-5 text-gray-500" />}
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+      >
         <div className="space-y-4">
           <div>
             <Label htmlFor="label">Node Label</Label>
@@ -117,7 +127,7 @@ export function WaitNodeDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </NodeDialogLayout>
     </Dialog>
   );
 }

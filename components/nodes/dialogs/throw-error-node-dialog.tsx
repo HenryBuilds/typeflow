@@ -1,34 +1,38 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { AlertTriangle } from "lucide-react";
+import { InputDataItem } from "./types";
+import { NodeDialogLayout } from "./node-dialog-layout";
 
 interface ThrowErrorNodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  nodeId?: string;
+  organizationId?: string;
   initialConfig?: {
     errorMessage?: string;
     errorType?: string;
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: { errorMessage: string; errorType: string } }) => void;
 }
 
 export function ThrowErrorNodeDialog({
   open,
   onOpenChange,
+  nodeId,
+  organizationId,
   initialConfig,
   initialLabel,
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: ThrowErrorNodeDialogProps) {
   const [label, setLabel] = useState("Throw Error");
@@ -57,17 +61,20 @@ export function ThrowErrorNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-red-500/10">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            </div>
-            Configure Throw Error
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
+      <NodeDialogLayout
+        title="Configure Throw Error"
+        icon={
+          <div className="p-1.5 rounded-md bg-red-500/10">
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+          </div>
+        }
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="errorType">Error Type</Label>
             <Input
@@ -93,17 +100,17 @@ export function ThrowErrorNodeDialog({
               The error message that will be thrown
             </p>
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </NodeDialogLayout>
     </Dialog>
   );
 }

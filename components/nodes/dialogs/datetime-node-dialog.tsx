@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,11 +15,13 @@ import {
 } from "@/components/ui/select";
 import { ExpressionInput } from "@/components/ui/expression-input";
 import { InputDataItem } from "./types";
+import { NodeDialogLayout } from "./node-dialog-layout";
 
 interface DateTimeNodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeId: string;
+  organizationId?: string;
   initialConfig?: {
     operation?: "format" | "add" | "subtract" | "extract";
     inputField?: string;
@@ -39,6 +41,7 @@ export function DateTimeNodeDialog({
   open,
   onOpenChange,
   nodeId,
+  organizationId,
   initialConfig,
   initialLabel = "DateTime",
   inputData = [],
@@ -91,13 +94,15 @@ export function DateTimeNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-gray-500" />
-            Configure DateTime
-          </DialogTitle>
-        </DialogHeader>
+      <NodeDialogLayout
+        title="Configure DateTime"
+        icon={<Calendar className="h-5 w-5 text-gray-500" />}
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+      >
         <div className="space-y-4">
           <div>
             <Label htmlFor="label">Node Label</Label>
@@ -218,8 +223,7 @@ export function DateTimeNodeDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </NodeDialogLayout>
     </Dialog>
   );
 }
-

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { ExpressionInput } from "@/components/ui/expression-input";
 import { InputDataItem } from "./types";
+import { NodeDialogLayout } from "./node-dialog-layout";
 
 interface Header {
   key: string;
@@ -25,6 +26,7 @@ interface HttpRequestNodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeId: string;
+  organizationId?: string;
   initialConfig?: {
     url?: string;
     method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -42,6 +44,7 @@ export function HttpRequestNodeDialog({
   open,
   onOpenChange,
   nodeId,
+  organizationId,
   initialConfig,
   initialLabel = "HTTP Request",
   inputData = [],
@@ -101,13 +104,15 @@ export function HttpRequestNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5 text-gray-500" />
-            Configure HTTP Request
-          </DialogTitle>
-        </DialogHeader>
+      <NodeDialogLayout
+        title="Configure HTTP Request"
+        icon={<Globe className="h-5 w-5 text-gray-500" />}
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+      >
         <div className="space-y-4">
           <div>
             <Label htmlFor="label">Node Label</Label>
@@ -231,8 +236,9 @@ export function HttpRequestNodeDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </NodeDialogLayout>
     </Dialog>
   );
 }
+
 

@@ -1,20 +1,25 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Layers } from "lucide-react";
+import { InputDataItem } from "./types";
+import { NodeDialogLayout } from "./node-dialog-layout";
 
 interface AggregateNodeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeId: string;
+  organizationId?: string;
   initialConfig?: {
     outputField?: string;
   };
   initialLabel?: string;
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
   onSave: (data: { label: string; config: { outputField: string } }) => void;
 }
 
@@ -22,8 +27,11 @@ export function AggregateNodeDialog({
   open,
   onOpenChange,
   nodeId,
+  organizationId,
   initialConfig,
   initialLabel = "Aggregate",
+  inputData = [],
+  sourceNodeLabels = {},
   onSave,
 }: AggregateNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel);
@@ -48,13 +56,15 @@ export function AggregateNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Layers className="h-5 w-5 text-gray-500" />
-            Configure Aggregate
-          </DialogTitle>
-        </DialogHeader>
+      <NodeDialogLayout
+        title="Configure Aggregate"
+        icon={<Layers className="h-5 w-5 text-gray-500" />}
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+      >
         <div className="space-y-4">
           <div>
             <Label htmlFor="label">Node Label</Label>
@@ -88,7 +98,7 @@ export function AggregateNodeDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
+      </NodeDialogLayout>
     </Dialog>
   );
 }

@@ -2,13 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Database, Plus, Key, Edit, Trash2, Settings } from "lucide-react";
+import { Database, Plus, Key, Edit, Trash2 } from "lucide-react";
+import { NodeDialogLayout } from "@/components/nodes/dialogs/node-dialog-layout";
+import { InputDataItem } from "@/components/nodes/dialogs/types";
 
 type DatabaseType = "postgres" | "mysql" | "mongodb" | "redis";
 
@@ -46,8 +42,8 @@ interface DatabaseNodeDialogProps {
   onAddCredential?: () => void;
   onEditCredential?: (credentialId: string) => void;
   // Input data from previous nodes for expression suggestions
-  inputData?: Record<string, unknown>;
-  sourceNodeLabels?: string[];
+  inputData?: InputDataItem[];
+  sourceNodeLabels?: Record<string, string>;
 }
 
 // Operation definitions per database type
@@ -109,8 +105,8 @@ export function DatabaseNodeDialog({
   onSave,
   onAddCredential,
   onEditCredential,
-  inputData,
-  sourceNodeLabels,
+  inputData = [],
+  sourceNodeLabels = {},
 }: DatabaseNodeDialogProps) {
   const [label, setLabel] = useState(initialLabel || DATABASE_LABELS[databaseType]);
   const [operation, setOperation] = useState(initialConfig?.operation || OPERATIONS[databaseType][0]?.value || "query");
@@ -194,17 +190,19 @@ export function DatabaseNodeDialog({
   const getExpressionSuggestions = (): string[] => {
     const suggestions: string[] = [];
     
-    if (inputData) {
-      const addSuggestions = (obj: Record<string, unknown>, prefix = "") => {
-        for (const [k, v] of Object.entries(obj)) {
-          const path = prefix ? `${prefix}.${k}` : k;
-          suggestions.push(`{{ $json.${path} }}`);
-          if (v && typeof v === "object" && !Array.isArray(v)) {
-            addSuggestions(v as Record<string, unknown>, path);
+    for (const item of inputData) {
+      if (item.output && typeof item.output === "object") {
+        const addSuggestions = (obj: Record<string, unknown>, prefix = "") => {
+          for (const [k, v] of Object.entries(obj)) {
+            const path = prefix ? `${prefix}.${k}` : k;
+            suggestions.push(`{{ $json.${path} }}`);
+            if (v && typeof v === "object" && !Array.isArray(v)) {
+              addSuggestions(v as Record<string, unknown>, path);
+            }
           }
-        }
-      };
-      addSuggestions(inputData);
+        };
+        addSuggestions(item.output as Record<string, unknown>);
+      }
     }
 
     return suggestions;
@@ -214,15 +212,16 @@ export function DatabaseNodeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            Configure {DATABASE_LABELS[databaseType]}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto space-y-4 py-4">
+      <NodeDialogLayout
+        title={`Configure ${DATABASE_LABELS[databaseType]}`}
+        icon={<Database className="h-5 w-5" />}
+        sidebar={{
+          inputData,
+          sourceNodeLabels,
+          organizationId,
+        }}
+      >
+        <div className="space-y-4">
           {/* Node Label */}
           <div className="space-y-2">
             <Label>Node Label</Label>
@@ -456,17 +455,17 @@ export function DatabaseNodeDialog({
               )}
             </>
           )}
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={!credentialId && filteredCredentials.length > 0}>
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={!credentialId && filteredCredentials.length > 0}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </NodeDialogLayout>
     </Dialog>
   );
 }
