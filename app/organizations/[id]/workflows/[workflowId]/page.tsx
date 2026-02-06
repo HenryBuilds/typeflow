@@ -2353,11 +2353,8 @@ export default function WorkflowEditorPage() {
                 setDatabaseDialogOpen(false);
                 setEditingDatabaseNode(null);
               }}
-              inputData={(() => {
-                const nodeInputs = getNodeInputData(editingDatabaseNode?.id);
-                return nodeInputs.length > 0 ? nodeInputs[0].output as Record<string, unknown> : undefined;
-              })()}
-              sourceNodeLabels={Object.values(sourceNodeLabels)}
+              inputData={getNodeInputData(editingDatabaseNode?.id)}
+              sourceNodeLabels={sourceNodeLabels}
             />
             
             {/* Debug Panel */}
