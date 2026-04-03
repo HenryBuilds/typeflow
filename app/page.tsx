@@ -236,124 +236,68 @@ function MockEdge({ d, status = "default" }: { d: string; status?: "completed" |
   return <path d={d} fill="none" strokeLinecap="round" style={styles} />;
 }
 
-/* ─── Scroll-locked flow section — IntersectionObserver + scroll hijack ─── */
+/* ─── Sticky flow section — scroll position drives progress, no hijacking ─── */
 function StickyFlowSection({ heroReady }: { heroReady: boolean }) {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null); // invisible trigger element
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
-  const lockedRef = useRef(false);
-  const readyRef = useRef(false);       // IO detected editor in zone
-  const doneRef = useRef(false);        // flow completed
-  const progressRef = useRef(0);
 
-  // Track touch position for mobile
-  const touchYRef = useRef<number | null>(null);
-
-  // ── IntersectionObserver: reliably detects when editor reaches center ──
   useEffect(() => {
-    if (!sentinelRef.current) return;
-    // rootMargin shrinks the detection box to just the middle ~30% of viewport
-    // top: -35% crops top 35%, bottom: -35% crops bottom 35% → only middle 30% triggers
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !doneRef.current) {
-          readyRef.current = true;
-        } else if (!lockedRef.current) {
-          readyRef.current = false;
-        }
-      },
-      { rootMargin: "-35% 0px -35% 0px", threshold: 0 }
-    );
-    observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  // ── Wheel + Touch handlers ──
-  useEffect(() => {
-    const WHEEL_SENSITIVITY = 0.0004;
-    const TOUCH_SENSITIVITY = 0.0015;
-
-    const handleDelta = (deltaY: number, preventDefault: () => void) => {
-      if (doneRef.current) { lockedRef.current = false; return; }
-
-      // Already locked — drive progress
-      if (lockedRef.current) {
-        preventDefault();
-        const next = Math.max(0, Math.min(1, progressRef.current + deltaY * WHEEL_SENSITIVITY));
-        progressRef.current = next;
-        setProgress(next);
-        if (next >= 1) { doneRef.current = true; lockedRef.current = false; }
-        if (next <= 0 && deltaY < 0) { lockedRef.current = false; }
-        return;
-      }
-
-      // Not locked — engage if IO says we're ready and scrolling down
-      if (deltaY > 0 && readyRef.current) {
-        lockedRef.current = true;
-        preventDefault();
-      }
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        if (!wrapperRef.current) return;
+        const rect = wrapperRef.current.getBoundingClientRect();
+        const viewH = window.innerHeight;
+        // Scrollable distance = wrapper height minus one viewport (the sticky viewport)
+        const scrollable = wrapperRef.current.offsetHeight - viewH;
+        if (scrollable <= 0) return;
+        // How far we've scrolled into the wrapper: 0 when top hits viewport top, scrollable when done
+        const scrolled = -rect.top;
+        setProgress(Math.max(0, Math.min(1, scrolled / scrollable)));
+      });
     };
-
-    const onWheel = (e: WheelEvent) => {
-      handleDelta(e.deltaY, () => e.preventDefault());
-    };
-
-    const onTouchStart = (e: TouchEvent) => {
-      touchYRef.current = e.touches[0].clientY;
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (touchYRef.current === null) return;
-      const currentY = e.touches[0].clientY;
-      const deltaY = touchYRef.current - currentY;
-      handleDelta(deltaY * (TOUCH_SENSITIVITY / WHEEL_SENSITIVITY), () => e.preventDefault());
-      touchYRef.current = currentY;
-    };
-
-    const onTouchEnd = () => { touchYRef.current = null; };
-
-    window.addEventListener("wheel", onWheel, { passive: false });
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("touchend", onTouchEnd, { passive: true });
-    return () => {
-      window.removeEventListener("wheel", onWheel);
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
-    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
-    <div ref={editorRef} className="relative z-10 px-5 sm:px-8 py-8 sm:py-12">
-      {/* Invisible sentinel — IO watches this to know when the editor is centered */}
-      <div ref={sentinelRef} className="absolute top-1/2 left-1/2 w-0 h-0" />
-      <div
-        className={`w-full max-w-6xl mx-auto transition-all duration-1000 delay-600 ${
-          heroReady ? "opacity-100 translate-y-0" : "opacity-0 translate-y-16"
-        }`}
-      >
-        <div className="relative">
-          {/* Glow */}
-          <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-primary/20 via-transparent to-chart-5/10 pointer-events-none" />
-          <div className="absolute -inset-4 bg-primary/[0.03] rounded-3xl blur-3xl" />
+    <div
+      ref={wrapperRef}
+      className="relative z-10"
+      style={{ height: "280vh" }}
+    >
+      <div className="sticky top-0 h-screen flex items-center justify-center px-5 sm:px-8">
+        <div
+          className={`w-full max-w-6xl transition-all duration-1000 delay-600 ${
+            heroReady ? "opacity-100 translate-y-0" : "opacity-0 translate-y-16"
+          }`}
+        >
+          <div className="relative">
+            {/* Glow */}
+            <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-primary/20 via-transparent to-chart-5/10 pointer-events-none" />
+            <div className="absolute -inset-4 bg-primary/[0.03] rounded-3xl blur-3xl" />
 
-          <div className="relative bg-card/60 dark:bg-card/40 backdrop-blur-2xl border border-border/40 rounded-2xl overflow-hidden shadow-[0_25px_70px_-15px_rgba(0,0,0,0.15)] dark:shadow-[0_25px_70px_-15px_rgba(0,0,0,0.5)]">
-            {/* Title bar */}
-            <div className="flex items-center px-4 py-2 bg-muted/40 backdrop-blur border-b border-border/30">
-              <div className="flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
-                <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
-                <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
+            <div className="relative bg-card/60 dark:bg-card/40 backdrop-blur-2xl border border-border/40 rounded-2xl overflow-hidden shadow-[0_25px_70px_-15px_rgba(0,0,0,0.15)] dark:shadow-[0_25px_70px_-15px_rgba(0,0,0,0.5)]">
+              {/* Title bar */}
+              <div className="flex items-center px-4 py-2 bg-muted/40 backdrop-blur border-b border-border/30">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
+                </div>
+                <span className="flex-1 text-center text-[11px] text-muted-foreground/60 font-medium select-none">
+                  Typeflow — Workflow Editor
+                </span>
+                <div className="w-12" />
               </div>
-              <span className="flex-1 text-center text-[11px] text-muted-foreground/60 font-medium select-none">
-                Typeflow — Workflow Editor
-              </span>
-              <div className="w-12" />
-            </div>
 
-            {/* Workflow canvas */}
-            <WorkflowMock progress={progress} />
+              {/* Workflow canvas */}
+              <WorkflowMock progress={progress} />
+            </div>
           </div>
         </div>
       </div>
@@ -627,7 +571,7 @@ return {
   const typing = useTyping(codeTabs[codeTab].code, 15);
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+    <div className="min-h-screen bg-background text-foreground" style={{ overflowX: "clip" }}>
       <ParticleField />
       <MouseGlow />
 
