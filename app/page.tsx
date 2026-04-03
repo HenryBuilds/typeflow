@@ -193,7 +193,7 @@ function MockNode({
         : "border-border/50 bg-card/80 dark:bg-card/40 shadow-sm";
 
   return (
-    <div className={`relative rounded-lg border-2 backdrop-blur-sm ${border}`} style={{ width: "100%", height: "100%", padding: "6px 10px" }}>
+    <div className={`relative rounded-lg border-2 backdrop-blur-sm transition-all duration-500 ${border}`} style={{ width: "100%", height: "100%", padding: "6px 10px" }}>
       {/* Handles */}
       {handleLeft && <div className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-[8px] h-[8px] rounded-full bg-muted-foreground/40 border-2 border-background" />}
       {handleRight && <div className="absolute -right-[5px] top-1/2 -translate-y-1/2 w-[8px] h-[8px] rounded-full bg-green-500/70 border-2 border-background" />}
@@ -236,155 +236,301 @@ function MockEdge({ d, status = "default" }: { d: string; status?: "completed" |
   return <path d={d} fill="none" strokeLinecap="round" style={styles} />;
 }
 
-/* ─── Full workflow mock — horizontal, big ─── */
-function WorkflowMock() {
-  // Horizontal layout: nodes flow left to right
-  // viewBox is wide: 960 x 380
+/* ─── Scroll-locked flow section — IntersectionObserver + scroll hijack ─── */
+function StickyFlowSection({ heroReady }: { heroReady: boolean }) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null); // invisible trigger element
+  const [progress, setProgress] = useState(0);
+  const lockedRef = useRef(false);
+  const readyRef = useRef(false);       // IO detected editor in zone
+  const doneRef = useRef(false);        // flow completed
+  const progressRef = useRef(0);
+
+  // Track touch position for mobile
+  const touchYRef = useRef<number | null>(null);
+
+  // ── IntersectionObserver: reliably detects when editor reaches center ──
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    // rootMargin shrinks the detection box to just the middle ~30% of viewport
+    // top: -35% crops top 35%, bottom: -35% crops bottom 35% → only middle 30% triggers
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !doneRef.current) {
+          readyRef.current = true;
+        } else if (!lockedRef.current) {
+          readyRef.current = false;
+        }
+      },
+      { rootMargin: "-35% 0px -35% 0px", threshold: 0 }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // ── Wheel + Touch handlers ──
+  useEffect(() => {
+    const WHEEL_SENSITIVITY = 0.0004;
+    const TOUCH_SENSITIVITY = 0.0015;
+
+    const handleDelta = (deltaY: number, preventDefault: () => void) => {
+      if (doneRef.current) { lockedRef.current = false; return; }
+
+      // Already locked — drive progress
+      if (lockedRef.current) {
+        preventDefault();
+        const next = Math.max(0, Math.min(1, progressRef.current + deltaY * WHEEL_SENSITIVITY));
+        progressRef.current = next;
+        setProgress(next);
+        if (next >= 1) { doneRef.current = true; lockedRef.current = false; }
+        if (next <= 0 && deltaY < 0) { lockedRef.current = false; }
+        return;
+      }
+
+      // Not locked — engage if IO says we're ready and scrolling down
+      if (deltaY > 0 && readyRef.current) {
+        lockedRef.current = true;
+        preventDefault();
+      }
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      handleDelta(e.deltaY, () => e.preventDefault());
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      touchYRef.current = e.touches[0].clientY;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (touchYRef.current === null) return;
+      const currentY = e.touches[0].clientY;
+      const deltaY = touchYRef.current - currentY;
+      handleDelta(deltaY * (TOUCH_SENSITIVITY / WHEEL_SENSITIVITY), () => e.preventDefault());
+      touchYRef.current = currentY;
+    };
+
+    const onTouchEnd = () => { touchYRef.current = null; };
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, []);
+
+  return (
+    <div ref={editorRef} className="relative z-10 px-5 sm:px-8 py-8 sm:py-12">
+      {/* Invisible sentinel — IO watches this to know when the editor is centered */}
+      <div ref={sentinelRef} className="absolute top-1/2 left-1/2 w-0 h-0" />
+      <div
+        className={`w-full max-w-6xl mx-auto transition-all duration-1000 delay-600 ${
+          heroReady ? "opacity-100 translate-y-0" : "opacity-0 translate-y-16"
+        }`}
+      >
+        <div className="relative">
+          {/* Glow */}
+          <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-primary/20 via-transparent to-chart-5/10 pointer-events-none" />
+          <div className="absolute -inset-4 bg-primary/[0.03] rounded-3xl blur-3xl" />
+
+          <div className="relative bg-card/60 dark:bg-card/40 backdrop-blur-2xl border border-border/40 rounded-2xl overflow-hidden shadow-[0_25px_70px_-15px_rgba(0,0,0,0.15)] dark:shadow-[0_25px_70px_-15px_rgba(0,0,0,0.5)]">
+            {/* Title bar */}
+            <div className="flex items-center px-4 py-2 bg-muted/40 backdrop-blur border-b border-border/30">
+              <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
+                <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
+                <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
+              </div>
+              <span className="flex-1 text-center text-[11px] text-muted-foreground/60 font-medium select-none">
+                Typeflow — Workflow Editor
+              </span>
+              <div className="w-12" />
+            </div>
+
+            {/* Workflow canvas */}
+            <WorkflowMock progress={progress} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Full workflow mock — scroll-driven flow progression ─── */
+function WorkflowMock({ progress }: { progress: number }) {
   const W = 140; // node width
-  const H = 58;  // node height (taller for output preview)
+  const H = 58;  // node height (with output preview)
   const Hs = 48; // shorter node without output
 
-  // Row positions
-  const row1 = 90;  // main pipeline Y
-  const row0 = 15;  // branch up
-  const row2 = 260; // branch down
+  // Generous row spacing for clear branching
+  const row1 = 170; // main pipeline Y (centered)
+  const row0 = 45;  // branch up
+  const row2 = 290; // branch down
 
-  // Column positions (x)
-  const col = [15, 190, 365, 540, 715];
+  // Column positions — 6 columns, merge gets its own column at the end
+  const col = [20, 190, 360, 530, 700, 870];
 
   type N = { x: number; y: number; w: number; h: number };
   const nodes: Record<string, N> = {
-    webhook:   { x: col[0], y: row1,     w: W,  h: Hs },
-    transform: { x: col[1], y: row1,     w: W,  h: H  },
-    ifNode:    { x: col[2], y: row1,     w: W,  h: Hs },
-    httpOk:    { x: col[3], y: row0,     w: W,  h: H  },
-    notify:    { x: col[4], y: row0,     w: W,  h: Hs },
-    logError:  { x: col[3], y: row2,     w: W,  h: H  },
-    retry:     { x: col[4], y: row2,     w: W,  h: Hs },
-    merge:     { x: col[4], y: row1 + 15, w: W, h: Hs },
+    webhook:   { x: col[0], y: row1,  w: W,  h: Hs },
+    transform: { x: col[1], y: row1,  w: W,  h: H  },
+    ifNode:    { x: col[2], y: row1,  w: W,  h: Hs },
+    httpOk:    { x: col[3], y: row0,  w: W,  h: H  },
+    notify:    { x: col[4], y: row0,  w: W,  h: Hs },
+    logError:  { x: col[3], y: row2,  w: W,  h: H  },
+    retry:     { x: col[4], y: row2,  w: W,  h: Hs },
+    merge:     { x: col[5], y: row1,  w: W,  h: Hs },
   };
+
+  // ── Progress-driven flow (0 → 8 steps from progress 0–1) ──
+  const step = Math.min(8, Math.floor(progress * 9));
+
+  // Node statuses based on current step
+  type S = "completed" | "running" | "default";
+  const s = (completedAt: number, runningAt: number): S =>
+    step >= completedAt ? "completed" : step >= runningAt ? "running" : "default";
+
+  const nodeStatus: Record<string, S> = {
+    webhook:   s(1, 0),   // running immediately, completed at step 1
+    transform: s(2, 1),   // running at 1, completed at 2
+    ifNode:    s(3, 2),   // running at 2, completed at 3
+    httpOk:    s(5, 3),   // running at 3, completed at 5
+    logError:  s(5, 3),   // running at 3, completed at 5
+    notify:    s(6, 5),   // running at 5, completed at 6
+    retry:     s(6, 5),   // running at 5, completed at 6
+    merge:     s(8, 7),   // running at 7, completed at 8
+  };
+
+  // Edge statuses — edge lights up when source is completed
+  const edgeStatus: S[] = [
+    nodeStatus.webhook   === "completed" ? (nodeStatus.transform === "completed" ? "completed" : "running") : "default", // webhook → transform
+    nodeStatus.transform === "completed" ? (nodeStatus.ifNode    === "completed" ? "completed" : "running") : "default", // transform → IF
+    nodeStatus.ifNode    === "completed" ? (nodeStatus.httpOk    === "completed" ? "completed" : "running") : "default", // IF → HTTP
+    nodeStatus.ifNode    === "completed" ? (nodeStatus.logError  === "completed" ? "completed" : "running") : "default", // IF → logError
+    nodeStatus.httpOk    === "completed" ? (nodeStatus.notify    === "completed" ? "completed" : "running") : "default", // HTTP → notify
+    nodeStatus.logError  === "completed" ? (nodeStatus.retry     === "completed" ? "completed" : "running") : "default", // logError → retry
+    nodeStatus.notify    === "completed" ? (nodeStatus.merge     === "completed" ? "completed" : "running") : "default", // notify → merge
+    nodeStatus.retry     === "completed" ? (nodeStatus.merge     === "completed" ? "completed" : "running") : "default", // retry → merge
+  ];
 
   // Helpers
   const right = (n: N) => n.x + n.w;
   const left = (n: N) => n.x;
   const midY = (n: N) => n.y + n.h / 2;
-  const midX = (n: N) => n.x + n.w / 2;
-  const bot = (n: N) => n.y + n.h;
 
   // Horizontal bezier
   const hEdge = (sx: number, sy: number, tx: number, ty: number) => {
-    const dx = Math.abs(tx - sx) * 0.45;
+    const dx = Math.abs(tx - sx) * 0.4;
     return `M ${sx},${sy} C ${sx + dx},${sy} ${tx - dx},${ty} ${tx},${ty}`;
   };
 
-  // Vertical bezier (for branch splits)
-  const vEdge = (sx: number, sy: number, tx: number, ty: number) => {
-    const dy = Math.abs(ty - sy) * 0.5;
-    return `M ${sx},${sy} C ${sx},${sy + (ty > sy ? dy : -dy)} ${tx},${ty + (ty > sy ? -dy : dy)} ${tx},${ty}`;
+  // Branch bezier — exits right then curves to target
+  const branchEdge = (from: N, to: N) => {
+    const sx = right(from), sy = midY(from), tx = left(to), ty = midY(to);
+    const midXPos = sx + (tx - sx) * 0.5;
+    return `M ${sx},${sy} C ${midXPos},${sy} ${midXPos},${ty} ${tx},${ty}`;
   };
 
-  const edges = [
-    // Webhook → Transform
-    { d: hEdge(right(nodes.webhook), midY(nodes.webhook), left(nodes.transform), midY(nodes.transform)), status: "completed" as const },
-    // Transform → IF
-    { d: hEdge(right(nodes.transform), midY(nodes.transform), left(nodes.ifNode), midY(nodes.ifNode)), status: "completed" as const },
-    // IF → HTTP (true, branch up)
-    { d: vEdge(midX(nodes.ifNode), nodes.ifNode.y, midX(nodes.httpOk), bot(nodes.httpOk)), status: "running" as const },
-    // IF → Log Error (false, branch down)
-    { d: vEdge(midX(nodes.ifNode), bot(nodes.ifNode), midX(nodes.logError), nodes.logError.y), status: "default" as const },
-    // HTTP → Notify
-    { d: hEdge(right(nodes.httpOk), midY(nodes.httpOk), left(nodes.notify), midY(nodes.notify)), status: "default" as const },
-    // Log Error → Retry
-    { d: hEdge(right(nodes.logError), midY(nodes.logError), left(nodes.retry), midY(nodes.retry)), status: "default" as const },
-    // Notify → Merge
-    { d: vEdge(midX(nodes.notify), bot(nodes.notify), midX(nodes.merge), nodes.merge.y), status: "default" as const },
-    // Retry → Merge
-    { d: vEdge(midX(nodes.retry), nodes.retry.y, midX(nodes.merge), bot(nodes.merge)), status: "default" as const },
+  const edgePaths = [
+    hEdge(right(nodes.webhook), midY(nodes.webhook), left(nodes.transform), midY(nodes.transform)),
+    hEdge(right(nodes.transform), midY(nodes.transform), left(nodes.ifNode), midY(nodes.ifNode)),
+    branchEdge(nodes.ifNode, nodes.httpOk),
+    branchEdge(nodes.ifNode, nodes.logError),
+    hEdge(right(nodes.httpOk), midY(nodes.httpOk), left(nodes.notify), midY(nodes.notify)),
+    hEdge(right(nodes.logError), midY(nodes.logError), left(nodes.retry), midY(nodes.retry)),
+    branchEdge(nodes.notify, nodes.merge),
+    branchEdge(nodes.retry, nodes.merge),
   ];
 
   const nodeList: { key: string; n: N; el: ReactNode }[] = [
     { key: "webhook", n: nodes.webhook, el: (
-      <MockNode icon={<Webhook style={{ width: 15, height: 15 }} />} title="Webhook" desc="POST /api/incoming" status="completed" handleRight />
+      <MockNode icon={<Webhook style={{ width: 15, height: 15 }} />} title="Webhook" desc="POST /api/incoming" status={nodeStatus.webhook} handleRight />
     )},
     { key: "transform", n: nodes.transform, el: (
-      <MockNode icon={<Code style={{ width: 15, height: 15 }} />} title="Transform" desc="Parse & validate" output='{ user: "john", valid: true }' status="completed" handleLeft handleRight />
+      <MockNode icon={<Code style={{ width: 15, height: 15 }} />} title="Transform" desc="Parse & validate" output='{ user: "john", valid: true }' status={nodeStatus.transform} handleLeft handleRight />
     )},
     { key: "if", n: nodes.ifNode, el: (
-      <MockNode icon={<GitBranch style={{ width: 15, height: 15 }} />} title="IF" desc='$json.valid === true' status="running" handleLeft handleTop handleBottom multiBottom />
+      <MockNode icon={<GitBranch style={{ width: 15, height: 15 }} />} title="IF" desc='$json.valid === true' status={nodeStatus.ifNode} handleLeft handleRight />
     )},
     { key: "httpOk", n: nodes.httpOk, el: (
-      <MockNode icon={<Globe style={{ width: 15, height: 15 }} />} title="HTTP Request" desc="POST api.example.com" output="200 OK — 42ms" handleLeft handleRight handleTop />
+      <MockNode icon={<Globe style={{ width: 15, height: 15 }} />} title="HTTP Request" desc="POST api.example.com" output="200 OK — 42ms" status={nodeStatus.httpOk} handleLeft handleRight />
     )},
     { key: "notify", n: nodes.notify, el: (
-      <MockNode icon={<Webhook style={{ width: 15, height: 15 }} />} title="Slack Notify" desc="#deployments" handleLeft handleBottom />
+      <MockNode icon={<Webhook style={{ width: 15, height: 15 }} />} title="Slack Notify" desc="#deployments" status={nodeStatus.notify} handleLeft handleRight />
     )},
     { key: "logError", n: nodes.logError, el: (
-      <MockNode icon={<Filter style={{ width: 15, height: 15 }} />} title="Log Error" desc="Write to error_log" output='{ level: "error", ts: ... }' handleLeft handleRight handleTop />
+      <MockNode icon={<Filter style={{ width: 15, height: 15 }} />} title="Log Error" desc="Write to error_log" output='{ level: "error", ts: ... }' status={nodeStatus.logError} handleLeft handleRight />
     )},
     { key: "retry", n: nodes.retry, el: (
-      <MockNode icon={<Timer style={{ width: 15, height: 15 }} />} title="Wait & Retry" desc="Delay 30s, max 3" handleLeft handleTop />
+      <MockNode icon={<Timer style={{ width: 15, height: 15 }} />} title="Wait & Retry" desc="Delay 30s, max 3" status={nodeStatus.retry} handleLeft handleRight />
     )},
     { key: "merge", n: nodes.merge, el: (
-      <MockNode icon={<Workflow style={{ width: 15, height: 15 }} />} title="Merge" desc="Combine results" handleTop handleBottom />
+      <MockNode icon={<Workflow style={{ width: 15, height: 15 }} />} title="Merge" desc="Combine results" status={nodeStatus.merge} handleLeft handleRight />
     )},
   ];
 
+  // Branch label visibility
+  const branchVisible = nodeStatus.ifNode === "completed";
+
   return (
-    <div className="relative w-full overflow-hidden" style={{ aspectRatio: "960 / 380" }}>
+    <div className="relative w-full overflow-hidden" style={{ aspectRatio: "1050 / 400" }}>
       {/* Dot grid */}
       <div
-        className="absolute inset-0 opacity-[0.035] dark:opacity-[0.06]"
+        className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
         style={{
           backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)",
-          backgroundSize: "20px 20px",
+          backgroundSize: "24px 24px",
           animation: "dot-drift 30s ease-in-out infinite",
         }}
       />
 
       {/* Zoom controls hint (bottom-left) */}
-      <div className="absolute bottom-2.5 left-3 flex flex-col gap-0.5 opacity-30">
+      <div className="absolute bottom-3 left-3.5 flex flex-col gap-0.5 opacity-25">
         <div className="w-5 h-5 rounded border border-border/50 bg-card/40 backdrop-blur-sm flex items-center justify-center text-[10px] text-muted-foreground/60 font-medium">+</div>
         <div className="w-5 h-5 rounded border border-border/50 bg-card/40 backdrop-blur-sm flex items-center justify-center text-[10px] text-muted-foreground/60 font-medium">−</div>
       </div>
 
       {/* Mini-map hint (bottom-right) */}
-      <div className="absolute bottom-2.5 right-3 w-20 h-12 rounded border border-border/30 bg-card/30 backdrop-blur-sm opacity-30">
+      <div className="absolute bottom-3 right-3.5 w-[72px] h-[44px] rounded border border-border/30 bg-card/30 backdrop-blur-sm opacity-25">
         <div className="absolute inset-1 border border-primary/20 rounded-[2px]" />
-        <div className="absolute top-2 left-3 w-[40%] h-[2px] bg-green-500/30 rounded-full" />
-        <div className="absolute top-4 left-3 w-[40%] h-[2px] bg-green-500/30 rounded-full" />
-        <div className="absolute top-3 left-[50%] w-[25%] h-[2px] bg-blue-500/30 rounded-full" />
-        <div className="absolute top-5 left-[50%] w-[25%] h-[2px] bg-muted-foreground/15 rounded-full" />
+        <div className="absolute top-2 left-2.5 w-[38%] h-[2px] bg-green-500/30 rounded-full" />
+        <div className="absolute top-4 left-2.5 w-[38%] h-[2px] bg-green-500/30 rounded-full" />
+        <div className="absolute top-3 left-[48%] w-[22%] h-[2px] bg-blue-500/30 rounded-full" />
+        <div className="absolute top-5 left-[48%] w-[22%] h-[2px] bg-muted-foreground/15 rounded-full" />
       </div>
 
       <svg
-        viewBox="0 0 880 340"
+        viewBox="0 0 1050 400"
         className="absolute inset-0 w-full h-full"
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label="Horizontal workflow editor showing a webhook pipeline with branching, error handling, and merge"
       >
         {/* Edges */}
-        {edges.map((e, i) => (
-          <MockEdge key={i} d={e.d} status={e.status} />
+        {edgePaths.map((d, i) => (
+          <MockEdge key={i} d={d} status={edgeStatus[i]} />
         ))}
 
-        {/* Branch labels */}
-        <text x={midX(nodes.ifNode) - 4} y={nodes.ifNode.y - 8} style={{ fontSize: 10, fontWeight: 600 }} className="fill-green-500/50">true</text>
-        <text x={midX(nodes.ifNode) - 5} y={bot(nodes.ifNode) + 14} style={{ fontSize: 10, fontWeight: 600 }} className="fill-red-500/40">false</text>
-
-        {/* Data flow badges on completed edges */}
-        <g className="animate-[edge-pulse_3s_ease-in-out_infinite]">
-          <rect x={right(nodes.webhook) + 18} y={midY(nodes.webhook) - 8} width="28" height="14" rx="4" className="fill-green-500/10 stroke-green-500/25" strokeWidth="0.5" />
-          <text x={right(nodes.webhook) + 22} y={midY(nodes.webhook) + 1} style={{ fontSize: 8, fontWeight: 500 }} className="fill-green-500/60">3 items</text>
-        </g>
-        <g className="animate-[edge-pulse_3s_ease-in-out_infinite_0.5s]">
-          <rect x={right(nodes.transform) + 18} y={midY(nodes.transform) - 8} width="28" height="14" rx="4" className="fill-green-500/10 stroke-green-500/25" strokeWidth="0.5" />
-          <text x={right(nodes.transform) + 22} y={midY(nodes.transform) + 1} style={{ fontSize: 8, fontWeight: 500 }} className="fill-green-500/60">3 items</text>
-        </g>
+        {/* Branch labels — fade in when IF node completes */}
+        <text
+          x={right(nodes.ifNode) + 22} y={midY(nodes.ifNode) - 28}
+          style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.03em", transition: "opacity 0.5s", opacity: branchVisible ? 1 : 0 }}
+          className="fill-green-500/50"
+        >true</text>
+        <text
+          x={right(nodes.ifNode) + 22} y={midY(nodes.ifNode) + 34}
+          style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.03em", transition: "opacity 0.5s", opacity: branchVisible ? 1 : 0 }}
+          className="fill-red-500/40"
+        >false</text>
 
         {/* Nodes */}
         {nodeList.map((item) => (
-          <foreignObject key={item.key} x={item.n.x} y={item.n.y} width={item.n.w} height={item.n.h}>
+          <foreignObject key={item.key} x={item.n.x} y={item.n.y} width={item.n.w} height={item.n.h} style={{ overflow: "visible" }}>
             {item.el}
           </foreignObject>
         ))}
@@ -577,38 +723,11 @@ return {
           </div>
         </div>
 
-        {/* ── Editor mock with parallax ── */}
-        <div
-          className={`mt-14 sm:mt-20 lg:mt-24 transition-all duration-1000 delay-600 ${
-            heroReady ? "opacity-100 translate-y-0" : "opacity-0 translate-y-16"
-          }`}
-          style={{ transform: heroReady ? `translateY(${scrollY * -0.05}px)` : undefined }}
-        >
-          <div className="relative w-full max-w-6xl mx-auto">
-            {/* Glow */}
-            <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-primary/20 via-transparent to-chart-5/10 pointer-events-none" />
-            <div className="absolute -inset-4 bg-primary/[0.03] rounded-3xl blur-3xl" />
-
-            <div className="relative bg-card/60 dark:bg-card/40 backdrop-blur-2xl border border-border/40 rounded-2xl overflow-hidden shadow-[0_25px_70px_-15px_rgba(0,0,0,0.15)] dark:shadow-[0_25px_70px_-15px_rgba(0,0,0,0.5)]">
-              {/* Title bar */}
-              <div className="flex items-center px-4 py-2 bg-muted/40 backdrop-blur border-b border-border/30">
-                <div className="flex gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-foreground/10" />
-                </div>
-                <span className="flex-1 text-center text-[11px] text-muted-foreground/60 font-medium select-none">
-                  Typeflow — Workflow Editor
-                </span>
-                <div className="w-12" />
-              </div>
-
-              {/* Workflow canvas */}
-              <WorkflowMock />
-            </div>
-          </div>
-        </div>
       </section>
+
+      {/* ══════════ STICKY FLOW SECTION ══════════ */}
+      {/* Tall container — scroll distance within this drives the flow animation */}
+      <StickyFlowSection heroReady={heroReady} />
 
       {/* ══════════ FEATURES ══════════ */}
       <section id="features" className="relative z-10 px-5 sm:px-8 py-24 sm:py-32 lg:py-40">
@@ -899,18 +1018,80 @@ return {
               {[
                 {
                   n: "01",
+                  phase: "Design",
                   title: "Design your workflow visually",
-                  body: "Drag nodes onto a canvas and connect them. Define the execution order, branching logic, and data flow — all without writing config files.",
+                  body: "Drag nodes onto an infinite canvas and connect them with edges. Define execution order, branching logic, and parallel paths — all without writing config files or YAML.",
+                  details: [
+                    "Webhook, HTTP, Transform, IF/Switch, Merge, and Loop nodes out of the box",
+                    "Zoom, pan, and minimap for navigating complex workflows",
+                    "Group nodes into sub-workflows to keep things organized",
+                  ],
                 },
                 {
                   n: "02",
-                  title: "Write TypeScript in every node",
-                  body: "Each node is a function. Import packages, handle errors, transform data. The editor gives you IntelliSense and type checking in the browser.",
+                  phase: "Design",
+                  title: "Connect to any API or service",
+                  body: "Every HTTP node can talk to external APIs. Configure authentication once, reuse it everywhere. Credentials are encrypted and scoped to your organization.",
+                  details: [
+                    "OAuth2, API keys, Bearer tokens, and custom auth headers",
+                    "Response mapping with JSONPath and dot notation",
+                    "Automatic retries with configurable backoff strategies",
+                  ],
                 },
                 {
                   n: "03",
-                  title: "Debug, test, and deploy",
-                  body: "Set breakpoints, step through nodes, inspect data at each stage. When it works, deploy it. Workflows run on a BullMQ-backed queue for reliability.",
+                  phase: "Code",
+                  title: "Write TypeScript in every node",
+                  body: "Each node is a real function — not a config block. Import npm packages, handle errors, transform data. The browser-based editor gives you IntelliSense, type checking, and syntax highlighting.",
+                  details: [
+                    "Full access to Node.js built-ins and the npm ecosystem",
+                    "Type-safe input/output — downstream nodes know the shape of your data",
+                    "Shared utility modules across nodes in the same workflow",
+                  ],
+                },
+                {
+                  n: "04",
+                  phase: "Code",
+                  title: "Branch, loop, and merge",
+                  body: "Build real control flow. IF nodes evaluate expressions and split into branches. Switch nodes handle multiple cases. Loop nodes iterate over arrays. Merge nodes recombine parallel paths.",
+                  details: [
+                    "Expression language with access to all upstream data via $json",
+                    "Error branches that catch failures and route to fallback logic",
+                    "Parallel execution across branches with automatic synchronization at merge points",
+                  ],
+                },
+                {
+                  n: "05",
+                  phase: "Ship",
+                  title: "Debug with real breakpoints",
+                  body: "Set breakpoints on any node. When execution hits one, it pauses — you can inspect the input data, the output, and the full execution context. Step through nodes one by one or resume.",
+                  details: [
+                    "Inline data inspector showing the exact payload at each stage",
+                    "Execution timeline with duration and status per node",
+                    "Console output from each node captured and displayed in the editor",
+                  ],
+                },
+                {
+                  n: "06",
+                  phase: "Ship",
+                  title: "Test with live data",
+                  body: "Trigger workflows manually with sample payloads, or send a real webhook. Watch execution flow through the canvas in real time — nodes light up as they run, and you see the output immediately.",
+                  details: [
+                    "Pin test payloads to workflows for repeatable testing",
+                    "Partial execution — run from any node forward with mock input",
+                    "Diff view comparing output between runs",
+                  ],
+                },
+                {
+                  n: "07",
+                  phase: "Ship",
+                  title: "Deploy and scale",
+                  body: "When it works, ship it. Workflows run on a BullMQ-backed job queue — they survive crashes, retry on failure, and scale horizontally. Version history lets you roll back any time.",
+                  details: [
+                    "Persistent queue with at-least-once delivery guarantees",
+                    "Cron triggers for scheduled execution",
+                    "Execution logs with full replay capability",
+                  ],
                 },
               ].map((step, i) => (
                 <div
@@ -918,22 +1099,111 @@ return {
                   className={`flex gap-6 sm:gap-10 items-start transition-all duration-700 ${
                     secSteps.inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
                   }`}
-                  style={{ transitionDelay: secSteps.inView ? `${200 + i * 150}ms` : "0ms" }}
+                  style={{ transitionDelay: secSteps.inView ? `${200 + i * 120}ms` : "0ms" }}
                 >
-                  {/* Number circle */}
+                  {/* Number circle with phase indicator */}
                   <div className="relative shrink-0 hidden md:block">
                     <div className="w-10 h-10 sm:w-16 sm:h-16 rounded-full border border-border/60 bg-card/80 backdrop-blur flex items-center justify-center">
                       <span className="text-xs sm:text-sm font-bold text-muted-foreground/60 font-mono">{step.n}</span>
                     </div>
+                    <span className="absolute -right-1 -top-1 text-[9px] font-mono font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded-full bg-primary/10 text-primary/60 border border-primary/15">
+                      {step.phase}
+                    </span>
                   </div>
-                  <div className="pt-0 md:pt-2 lg:pt-4">
-                    <span className="text-xs font-mono text-muted-foreground/40 mb-1 block md:hidden">{step.n}</span>
+                  <div className="pt-0 md:pt-1 lg:pt-2">
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-xs font-mono text-muted-foreground/40 block md:hidden">{step.n}</span>
+                      <span className="text-[10px] font-mono font-semibold tracking-wider uppercase text-primary/50 block md:hidden">{step.phase}</span>
+                    </div>
                     <h3 className="text-lg sm:text-xl font-semibold mb-2 text-foreground">{step.title}</h3>
-                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-lg">{step.body}</p>
+                    <p className="text-sm sm:text-base text-muted-foreground leading-relaxed max-w-lg mb-3">{step.body}</p>
+                    <ul className="space-y-1.5 max-w-lg">
+                      {step.details.map((d, j) => (
+                        <li key={j} className="flex items-start gap-2 text-sm text-muted-foreground/60 leading-relaxed">
+                          <span className="shrink-0 mt-1.5 w-1 h-1 rounded-full bg-primary/40" />
+                          {d}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════ HIGHLIGHT BANNER ══════════ */}
+      <section className="relative z-10 px-5 sm:px-8 py-20 sm:py-28 lg:py-36 overflow-hidden">
+        <div className="max-w-5xl mx-auto relative">
+          {/* Background glow */}
+          <div className="absolute -inset-10 bg-gradient-to-r from-primary/[0.07] via-chart-5/[0.05] to-chart-2/[0.07] rounded-[2rem] blur-3xl" />
+
+          <div className="relative rounded-2xl border border-border/30 bg-card/40 backdrop-blur-2xl overflow-hidden">
+            {/* Top gradient line */}
+            <div className="h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+
+            <div className="px-8 sm:px-12 lg:px-16 py-14 sm:py-20">
+              {/* Headline */}
+              <div className="text-center mb-14 sm:mb-18">
+                <p className="text-sm font-mono text-primary/60 tracking-wider uppercase mb-4">The full picture</p>
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-5">
+                  From idea to production{" "}
+                  <br className="hidden sm:block" />
+                  <span className="bg-gradient-to-r from-primary via-chart-5 to-chart-2 bg-clip-text text-transparent">
+                    in one tool.
+                  </span>
+                </h2>
+                <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+                  No glue code between services. No context switching between tools.
+                  Design, write, debug, and deploy — all in the same editor.
+                </p>
+              </div>
+
+              {/* Stats grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+                {[
+                  { value: "100%", label: "TypeScript", sub: "Real code, not config" },
+                  { value: "0", label: "Vendor lock-in", sub: "Open source, self-hosted" },
+                  { value: "<5min", label: "To first workflow", sub: "From install to running" },
+                  { value: "\u221E", label: "Scalability", sub: "BullMQ-backed job queue" },
+                ].map((stat) => (
+                  <div key={stat.label} className="text-center group">
+                    <div className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight bg-gradient-to-b from-foreground to-foreground/60 bg-clip-text text-transparent mb-1.5">
+                      {stat.value}
+                    </div>
+                    <div className="text-sm sm:text-base font-semibold text-foreground/80 mb-0.5">{stat.label}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground/50">{stat.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Bottom feature pills */}
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mt-12 sm:mt-16">
+                {[
+                  "Visual Canvas",
+                  "IntelliSense",
+                  "Breakpoints",
+                  "npm Packages",
+                  "Webhooks",
+                  "Cron Triggers",
+                  "Encrypted Credentials",
+                  "Execution Logs",
+                  "Version History",
+                  "Self-Hosted",
+                ].map((pill) => (
+                  <span
+                    key={pill}
+                    className="px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium border border-border/40 bg-card/60 text-muted-foreground/70 backdrop-blur-sm"
+                  >
+                    {pill}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom gradient line */}
+            <div className="h-px bg-gradient-to-r from-transparent via-chart-5/50 to-transparent" />
           </div>
         </div>
       </section>
