@@ -730,9 +730,6 @@ return {
                 }`}
                 style={{
                   transitionDelay: secFeatures.inView ? `${150 + i * 80}ms` : "0ms",
-                  transform: secFeatures.inView
-                    ? `translateY(${scrollY * (i % 2 === 0 ? -0.02 : -0.015)}px)`
-                    : undefined,
                 }}
               >
                 <h3 className="text-base sm:text-lg font-semibold mb-2 text-foreground">{f.title}</h3>
